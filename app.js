@@ -90,6 +90,25 @@ boot().catch(showBootError);
 async function boot() {
   BOOT = await api({ action: "bootstrap" });
   renderHome();
+renderLegend();
+function renderLegend() {
+  const legendItemsEl = document.getElementById("legendItems");
+  if (!legendItemsEl) return;
+
+  legendItemsEl.innerHTML = "";
+
+  Object.entries(BOOT.primeTypes).forEach(([code, p]) => {
+    const item = document.createElement("div");
+    item.className = "legend-item";
+    item.innerHTML = `
+      <span class="legend-icon">${BOOT.icons[code] || "🔖"}</span>
+      <span>${p.label}</span>
+      <span>— ${p.montant.toFixed(2)}€</span>
+    `;
+    legendItemsEl.appendChild(item);
+  });
+}
+
   initYearWeekSelectors();
 
   backBtn.onclick = goHome;

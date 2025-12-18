@@ -68,7 +68,7 @@ button.action { background:var(--sage); border:none; color:#fff; font-weight:950
 /* bouton admin discret */
 .admin-hidden-btn{
   position: fixed;
-  bottom: 10px;
+  bottom: 84px;   /* au-dessus de la légende */
   right: 10px;
   width: 22px;
   height: 22px;
@@ -77,5 +77,48 @@ button.action { background:var(--sage); border:none; color:#fff; font-weight:950
   background: #000;
   opacity: .14;
   cursor: pointer;
+  z-index: 9999;  /* toujours au-dessus */
 }
 .admin-hidden-btn:hover{ opacity:.35; }
+/* ===== LÉGENDE FIXE ===== */
+.legend {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-top: 1px solid #e5e7e4;
+  padding: 8px 12px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,.05);
+  z-index: 20;
+}
+
+.legend-title {
+  font-weight: 900;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.legend-items {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border: 1px solid #e5e7e4;
+  border-radius: 999px;
+  background: #fafbfa;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.legend-icon {
+  font-size: 18px;
+}
+
