@@ -1,7 +1,12 @@
+/*************************************************
+ * CONFIG
+ *************************************************/
 const API_URL = "https://script.google.com/macros/s/AKfycbx94ffDuY0bSr1TYRHrI71c70L-_6icRs9fgXTZOB_hOeFV0lAnSPmsPUAVDnFrliw/exec";
 const ADMIN_CODE = "1234"; // même code que dans Code.gs
 
-// ---------- JSONP (anti-CORS GitHub Pages) ----------
+/*************************************************
+ * JSONP (anti-CORS GitHub Pages)
+ *************************************************/
 function jsonp(url, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const cb = "cb_" + Math.random().toString(36).slice(2);
@@ -47,7 +52,9 @@ async function api(params) {
   return data;
 }
 
-// ---------- DOM ----------
+/*************************************************
+ * DOM
+ *************************************************/
 const homeEl = document.getElementById("home");
 const weekViewEl = document.getElementById("weekView");
 const agentButtonsEl = document.getElementById("agentButtons");
@@ -66,16 +73,21 @@ const dayListEl = document.getElementById("dayList");
 
 const adminBtn = document.getElementById("adminHiddenBtn");
 
-// ---------- STATE ----------
+/*************************************************
+ * STATE
+ *************************************************/
 let BOOT = null;
 let currentAgent = null;
 let isAdmin = sessionStorage.getItem("isAdmin") === "1";
 
-// ---------- INIT ----------
+/*************************************************
+ * INIT
+ *************************************************/
 boot().catch(showBootError);
 
 async function boot() {
   BOOT = await api({ action: "bootstrap" });
+
   renderHome();
   initYearWeekSelectors();
   renderLegend();
@@ -89,6 +101,7 @@ async function boot() {
   adminBtn.onclick = () => {
     const code = prompt("Code admin ?");
     if (code === null) return;
+
     if (code === ADMIN_CODE) {
       isAdmin = true;
       sessionStorage.setItem("isAdmin", "1");
@@ -98,11 +111,6 @@ async function boot() {
       alert("Code incorrect");
     }
   };
-
-  // PWA: register service worker
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  }
 }
 
 function showBootError(err) {
@@ -114,7 +122,9 @@ function showBootError(err) {
   `;
 }
 
-// ---------- HOME (2 / 3 / 3) ----------
+/*************************************************
+ * HOME (2 / 3 / 3) + TUILES
+ *************************************************/
 function renderHome() {
   agentButtonsEl.innerHTML = "";
 
@@ -123,25 +133,29 @@ function renderHome() {
 
   const row1 = document.createElement("div");
   row1.className = "agent-row two";
+
   const row2 = document.createElement("div");
   row2.className = "agent-row three";
+
   const row3 = document.createElement("div");
   row3.className = "agent-row three";
 
   const rows = [row1, row1, row2, row2, row2, row3, row3, row3];
 
-  BOOT.agents.forEach((agent, idx) => {
+  (BOOT.agents || []).forEach((agent, idx) => {
     const b = document.createElement("button");
     b.className = "agent-tile";
     b.innerHTML = `
       <div class="left">
-        <div class="name">${agent}</div>
-        <div class="hint">Prime Semaine</div>
+        <div class="name">${escapeHtml(agent)}</div>
+        <div class="hint">Primes Semaine</div>
       </div>
       <div class="arrow">→</div>
     `;
     b.onclick = () => openAgent(agent);
-    rows[idx]?.appendChild(b);
+
+    const targetRow = rows[idx] || row3;
+    targetRow.appendChild(b);
   });
 
   groups.appendChild(row1);
@@ -164,32 +178,37 @@ function goHome() {
   weekViewEl.classList.add("hidden");
 }
 
-// ---------- LEGEND ----------
+/*************************************************
+ * LEGEND
+ *************************************************/
 function renderLegend() {
   const legendItemsEl = document.getElementById("legendItems");
   if (!legendItemsEl) return;
-  legendItemsEl.innerHTML = "";
 
-  const entries = Object.entries(BOOT.primeTypes).sort((a,b) => a[0].localeCompare(b[0]));
+  legendItemsEl.innerHTML = "";
+  const entries = Object.entries(BOOT.primeTypes || {}).sort((a, b) => a[0].localeCompare(b[0]));
+
   for (const [code, p] of entries) {
     const item = document.createElement("div");
     item.className = "legend-item";
     item.innerHTML = `
       <span class="legend-icon">${BOOT.icons?.[code] || "🔖"}</span>
-      <span>${p.label}</span>
-      <span>— ${Number(p.montant).toFixed(2)}€</span>
+      <span>${escapeHtml(p.label || code)}</span>
+      <span>— ${Number(p.montant || 0).toFixed(2)}€</span>
     `;
     legendItemsEl.appendChild(item);
   }
 }
 
-// ---------- YEAR / WEEK ----------
+/*************************************************
+ * YEAR / WEEK
+ *************************************************/
 function initYearWeekSelectors() {
   const now = new Date();
   const y = now.getFullYear();
 
   yearSelect.innerHTML = "";
-  [y - 1, y, y + 1].forEach(yy => {
+  [y - 1, y, y + 1].forEach((yy) => {
     const o = document.createElement("option");
     o.value = String(yy);
     o.textContent = String(yy);
@@ -229,7 +248,9 @@ function ensureYearOption(y) {
   yearSelect.appendChild(o);
 }
 
-// ---------- CORE : WEEK DISPLAY + ADMIN RESET ----------
+/*************************************************
+ * CORE : WEEK DISPLAY + ADMIN RESET
+ *************************************************/
 async function refreshWeek() {
   if (!currentAgent) return;
 
@@ -245,6 +266,7 @@ async function refreshWeek() {
   weekLabel.textContent = `Semaine ${week} — ${year}` + (isAdmin ? " (Admin)" : "");
   rangeLabel.textContent = `${formatFR(start)} → ${formatFR(addDays(end, -1))}`;
 
+  // Récup planning
   const res = await api({ action: "weekPlan", agent: currentAgent, start: startISO, end: endISO });
   const plan = res.plan || {}; // { "YYYY-MM-DD": ["ATTX","TCA"] }
 
@@ -254,7 +276,7 @@ async function refreshWeek() {
   for (let i = 0; i < 7; i++) {
     const d = addDays(start, i);
     const dISO = toISO(d);
-    const codes = plan[dISO] || [];
+    const codes = Array.isArray(plan[dISO]) ? plan[dISO] : [];
 
     const row = document.createElement("div");
     row.className = "dayrow";
@@ -279,6 +301,7 @@ async function refreshWeek() {
       for (const code of codes) {
         const p = BOOT.primeTypes?.[code];
         if (!p) continue;
+
         const amount = Number(p.montant || 0);
         totalDay += amount;
 
@@ -292,10 +315,11 @@ async function refreshWeek() {
         chips.appendChild(chip);
       }
     }
+
     totalWeek += totalDay;
     right.appendChild(chips);
 
-    // Admin panel (checkbox + save + reset day)
+    // Admin panel
     if (isAdmin) {
       const panel = document.createElement("div");
       panel.className = "admin-panel";
@@ -303,7 +327,7 @@ async function refreshWeek() {
       const checks = document.createElement("div");
       checks.className = "checks";
 
-      const entries = Object.entries(BOOT.primeTypes).sort((a,b) => a[0].localeCompare(b[0]));
+      const entries = Object.entries(BOOT.primeTypes || {}).sort((a, b) => a[0].localeCompare(b[0]));
       for (const [code, p] of entries) {
         const lab = document.createElement("label");
         lab.className = "check";
@@ -338,7 +362,8 @@ async function refreshWeek() {
 
       saveBtn.onclick = async () => {
         const selected = [...checks.querySelectorAll("input[type='checkbox']")]
-          .filter(x => x.checked).map(x => x.value);
+          .filter(x => x.checked)
+          .map(x => x.value);
 
         saveBtn.disabled = true;
         resetDayBtn.disabled = true;
@@ -400,12 +425,15 @@ async function refreshWeek() {
     dayListEl.appendChild(row);
   }
 
-  // Total semaine + reset semaine (admin)
+  // Total + reset semaine
   if (isAdmin) {
     weekTotalEl.innerHTML = `
       Total semaine : ${totalWeek.toFixed(2)}€
-      <button id="resetWeekBtn" class="danger" style="margin-left:10px;padding:8px 10px;border-radius:999px;">Réinitialiser semaine</button>
+      <button id="resetWeekBtn" class="danger" style="margin-left:10px;padding:8px 10px;border-radius:999px;">
+        Réinitialiser semaine
+      </button>
     `;
+
     const resetWeekBtn = document.getElementById("resetWeekBtn");
     resetWeekBtn.onclick = async () => {
       if (!confirm("⚠️ Réinitialiser TOUTE la semaine pour cet agent ?")) return;
@@ -431,7 +459,9 @@ async function refreshWeek() {
   }
 }
 
-// ---------- DATE UTILS ----------
+/*************************************************
+ * DATE UTILS
+ *************************************************/
 function getISOWeekStartDate(year, week) {
   const jan4 = new Date(Date.UTC(year, 0, 4));
   const day = (jan4.getUTCDay() + 6) % 7; // 0=lundi
@@ -463,4 +493,16 @@ function dayNameFR(d) {
 
 function formatFR(d) {
   return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"2-digit", year:"numeric" });
+}
+
+/*************************************************
+ * SMALL UTILS
+ *************************************************/
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
