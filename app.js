@@ -1,38 +1,6 @@
-// ===== CONFIG =====
 const API_URL = "https://script.google.com/macros/s/AKfycbx94ffDuY0bSr1TYRHrI71c70L-_6icRs9fgXTZOB_hOeFV0lAnSPmsPUAVDnFrliw/exec";
-const ADMIN_CODE = "1234"; // 🔴 doit matcher Code.gs
 
-// ===== STATE =====
-let BOOT = null;
-let currentAgent = null;
-let calendar = null;
-let isAdmin = false; // bascule via bouton caché
-
-// ===== DOM =====
-const homeEl = document.getElementById("home");
-const agentViewEl = document.getElementById("agentView");
-
-const agentButtonsEl = document.getElementById("agentButtons");
-const agentNameEl = document.getElementById("agentName");
-const monthTotalEl = document.getElementById("monthTotal");
-
-const adminFormEl = document.getElementById("adminForm");
-const primeDateEl = document.getElementById("primeDate");
-const primeCodeEl = document.getElementById("primeCode");
-const primeCommentEl = document.getElementById("primeComment");
-
-const adminAccessCardEl = document.getElementById("adminAccessCard");
-const accessChecksEl = document.getElementById("accessChecks");
-const saveAccessBtn = document.getElementById("saveAccessBtn");
-const saveAccessStatus = document.getElementById("saveAccessStatus");
-
-const modeBadgeEl = document.getElementById("modeBadge");
-const backBtn = document.getElementById("backBtn");
-const adminHiddenBtn = document.getElementById("adminHiddenBtn");
-
-backBtn.addEventListener("click", goHome);
-
-// ===== JSONP (anti-CORS) =====
+// ---------- JSONP (anti-CORS) ----------
 function jsonp(url, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const cbName = "cb_" + Math.random().toString(36).slice(2);
@@ -79,224 +47,252 @@ async function api(params) {
   return data;
 }
 
-// ===== INIT =====
-boot().catch(showBootError);
+// ---------- DOM ----------
+const homeEl = document.getElementById("home");
+const weekViewEl = document.getElementById("weekView");
+
+const agentButtonsEl = document.getElementById("agentButtons");
+const agentNameEl = document.getElementById("agentName");
+const backBtn = document.getElementById("backBtn");
+
+const yearSelect = document.getElementById("yearSelect");
+const weekSelect = document.getElementById("weekSelect");
+const prevWeekBtn = document.getElementById("prevWeekBtn");
+const nextWeekBtn = document.getElementById("nextWeekBtn");
+
+const weekLabel = document.getElementById("weekLabel");
+const rangeLabel = document.getElementById("rangeLabel");
+const weekTotalEl = document.getElementById("weekTotal");
+const dayListEl = document.getElementById("dayList");
+
+// ---------- STATE ----------
+let BOOT = null;
+let currentAgent = null;
+
+// ---------- BOOT ----------
+boot().catch(err => {
+  console.error(err);
+  agentButtonsEl.innerHTML = `<div style="padding:12px;border:1px solid #f2c2c2;background:#fff5f5;border-radius:12px;">
+    <b>Erreur chargement</b><br/>${String(err?.message || err)}
+  </div>`;
+});
 
 async function boot() {
-  setMode(false); // agent par défaut
   BOOT = await api({ action: "bootstrap" });
   renderHome();
-  setupAdminButton();
+
+  backBtn.addEventListener("click", goHome);
+  prevWeekBtn.addEventListener("click", () => shiftWeek(-1));
+  nextWeekBtn.addEventListener("click", () => shiftWeek(1));
+  yearSelect.addEventListener("change", () => refreshWeek());
+  weekSelect.addEventListener("change", () => refreshWeek());
+
+  initYearWeekSelectors();
 }
 
-function showBootError(err) {
-  console.error(err);
-  agentButtonsEl.innerHTML = `
-    <div class="notice">
-      <b>Erreur chargement</b><br/>
-      ${String(err?.message || err)}
-    </div>
-  `;
-}
-
-function setMode(admin) {
-  isAdmin = admin;
-  modeBadgeEl.textContent = `Mode : ${isAdmin ? "Admin" : "Agent"}`;
-
-  // UI admin visible uniquement si admin
-  adminFormEl.classList.toggle("hidden", !isAdmin);
-  adminAccessCardEl.classList.toggle("hidden", !isAdmin);
-}
-
-// ===== HOME =====
 function renderHome() {
   agentButtonsEl.innerHTML = "";
-  BOOT.agents.forEach(a => {
+  BOOT.agents.forEach(agent => {
     const b = document.createElement("button");
     b.className = "btn";
-    b.textContent = a;
-    b.onclick = () => openAgent(a);
+    b.textContent = agent;
+    b.onclick = () => openAgent(agent);
     agentButtonsEl.appendChild(b);
   });
 }
 
-function fillPrimeSelect() {
-  primeCodeEl.innerHTML = "";
-  const types = BOOT.primeTypes || {};
-  Object.keys(types).sort().forEach(code => {
-    const opt = document.createElement("option");
-    opt.value = code;
-    opt.textContent = `${code} — ${types[code].label} (${Number(types[code].montant).toFixed(2)}€)`;
-    primeCodeEl.appendChild(opt);
-  });
-}
-
-// ===== NAV =====
 function goHome() {
-  homeEl.classList.remove("hidden");
-  agentViewEl.classList.add("hidden");
   currentAgent = null;
-
-  if (calendar) { calendar.destroy(); calendar = null; }
-
-  saveAccessStatus.textContent = "";
-  accessChecksEl.innerHTML = "";
+  homeEl.classList.remove("hidden");
+  weekViewEl.classList.add("hidden");
 }
 
-// ===== AGENT VIEW =====
-async function openAgent(agent) {
+// ---------- YEAR / WEEK ----------
+function initYearWeekSelectors() {
+  const now = new Date();
+  const y = now.getFullYear();
+
+  // années: y-1, y, y+1 (modifiable)
+  yearSelect.innerHTML = "";
+  [y - 1, y, y + 1].forEach(yy => {
+    const opt = document.createElement("option");
+    opt.value = String(yy);
+    opt.textContent = String(yy);
+    if (yy === y) opt.selected = true;
+    yearSelect.appendChild(opt);
+  });
+
+  // semaines 1..52 (tu m’as demandé 52)
+  weekSelect.innerHTML = "";
+  for (let w = 1; w <= 52; w++) {
+    const opt = document.createElement("option");
+    opt.value = String(w);
+    opt.textContent = `Semaine ${w}`;
+    weekSelect.appendChild(opt);
+  }
+
+  // semaine courante ISO approximée
+  const isoWeek = getISOWeekNumber(now);
+  weekSelect.value = String(Math.min(52, Math.max(1, isoWeek)));
+}
+
+function openAgent(agent) {
   currentAgent = agent;
   agentNameEl.textContent = agent;
 
   homeEl.classList.add("hidden");
-  agentViewEl.classList.remove("hidden");
+  weekViewEl.classList.remove("hidden");
 
-  initCalendar();
+  refreshWeek();
+}
 
-  // admin features
-  if (isAdmin) {
-    primeDateEl.valueAsDate = new Date();
-    fillPrimeSelect();
-    wireAdminButtons();
-    await loadAccessUI();
+function shiftWeek(delta) {
+  let y = Number(yearSelect.value);
+  let w = Number(weekSelect.value);
+
+  w += delta;
+  if (w < 1) { w = 52; y -= 1; }
+  if (w > 52) { w = 1; y += 1; }
+
+  // si année pas dans la liste, on l’ajoute
+  ensureYearOption(y);
+  yearSelect.value = String(y);
+  weekSelect.value = String(w);
+
+  refreshWeek();
+}
+
+function ensureYearOption(y) {
+  const exists = Array.from(yearSelect.options).some(o => Number(o.value) === y);
+  if (exists) return;
+  const opt = document.createElement("option");
+  opt.value = String(y);
+  opt.textContent = String(y);
+  yearSelect.appendChild(opt);
+}
+
+// ---------- CORE: afficher la semaine ----------
+async function refreshWeek() {
+  if (!currentAgent) return;
+
+  const year = Number(yearSelect.value);
+  const week = Number(weekSelect.value);
+
+  const start = getISOWeekStartDate(year, week); // lundi
+  const end = addDays(start, 7);                 // lundi suivant (exclusif)
+
+  const startISO = toISODate(start);
+  const endISO = toISODate(end);
+
+  weekLabel.textContent = `Semaine ${week} — ${year}`;
+  rangeLabel.textContent = `${formatFR(start)} → ${formatFR(addDays(end, -1))}`;
+
+  const res = await api({ action: "events", agent: currentAgent, start: startISO, end: endISO });
+  const events = res.events || [];
+
+  // Regrouper par date YYYY-MM-DD
+  const byDay = new Map();
+  for (const e of events) {
+    const d = e.start; // YYYY-MM-DD
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push(e);
   }
 
-  // refresh initial
-  const v = calendar.view;
-  await refreshEvents(v.activeStart.toISOString().slice(0,10), v.activeEnd.toISOString().slice(0,10));
-  await refreshMonthTotal(v.currentStart);
-}
+  // Construire 7 jours
+  dayListEl.innerHTML = "";
+  let total = 0;
 
-function initCalendar() {
-  const el = document.getElementById("calendar");
-  if (calendar) { calendar.destroy(); calendar = null; }
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(start, i);
+    const dISO = toISODate(d);
+    const list = byDay.get(dISO) || [];
 
-  calendar = new FullCalendar.Calendar(el, {
-    initialView: "dayGridMonth",
-    height: "auto",
-    firstDay: 1,
-    headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth" },
-    datesSet: async (info) => {
-      await refreshEvents(info.startStr, info.endStr);
-      await refreshMonthTotal(info.view.currentStart);
-    }
-  });
-  calendar.render();
-}
+    const row = document.createElement("div");
+    row.className = "dayrow";
 
-async function refreshEvents(startStr, endStr) {
-  const res = await api({ action: "events", agent: currentAgent, start: startStr, end: endStr });
-  calendar.removeAllEvents();
-  (res.events || []).forEach(e => calendar.addEvent(e));
-}
-
-async function refreshMonthTotal(dateObj) {
-  const y = dateObj.getFullYear();
-  const m = dateObj.getMonth() + 1;
-  const res = await api({ action: "monthTotal", agent: currentAgent, year: String(y), month: String(m) });
-  monthTotalEl.textContent = `Total mois : ${Number(res.total).toFixed(2)}€`;
-}
-
-// ===== ADMIN MODE (hidden button) =====
-function setupAdminButton() {
-  adminHiddenBtn.addEventListener("click", () => {
-    const code = prompt("Code admin ?");
-    if (code === null) return;
-
-    if (code === ADMIN_CODE) {
-      setMode(true);
-      alert("Mode admin activé");
-      // si on est déjà dans la vue agent, on recharge l'UI admin
-      if (currentAgent) openAgent(currentAgent);
-    } else {
-      alert("Code incorrect");
-    }
-  });
-}
-
-function wireAdminButtons() {
-  // éviter multi-bind
-  const addBtn = document.getElementById("addBtn");
-  addBtn.onclick = addPrimeAdmin;
-  saveAccessBtn.onclick = saveAccess;
-}
-
-async function loadAccessUI() {
-  saveAccessStatus.textContent = "";
-  const res = await api({ action: "allowed", agent: currentAgent });
-  const allowed = new Set(res.codes || []);
-
-  accessChecksEl.innerHTML = "";
-  const entries = Object.entries(BOOT.primeTypes || {}).sort((a,b) => a[0].localeCompare(b[0]));
-
-  for (const [code, p] of entries) {
-    const icon = BOOT.icons?.[code] || "🔖";
-    const wrap = document.createElement("label");
-    wrap.className = "check";
-
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.value = code;
-    cb.checked = allowed.has(code);
-
-    const box = document.createElement("div");
-    box.innerHTML = `
-      <div class="label">${icon} ${code} — ${p.label}</div>
-      <div class="sub">${Number(p.montant).toFixed(2)}€</div>
+    const left = document.createElement("div");
+    left.className = "dayleft";
+    left.innerHTML = `
+      <div class="dayname">${dayNameFR(d)}</div>
+      <div class="daydate">${formatFR(d)}</div>
     `;
 
-    wrap.appendChild(cb);
-    wrap.appendChild(box);
-    accessChecksEl.appendChild(wrap);
+    const right = document.createElement("div");
+    right.className = "icons";
+
+    if (list.length === 0) {
+      right.innerHTML = `<span class="muted">—</span>`;
+    } else {
+      // afficher “logos” (icônes) + montant
+      for (const ev of list) {
+        const code = ev.extendedProps?.code || "";
+        const amount = Number(ev.extendedProps?.montant || 0);
+        total += amount;
+
+        const icon = BOOT.icons?.[code] || "🔖";
+        const label = BOOT.primeTypes?.[code]?.label || code;
+
+        const chip = document.createElement("div");
+        chip.className = "iconchip";
+        chip.title = label;
+
+        chip.innerHTML = `
+          <span class="icon">${icon}</span>
+          <span class="amount">${amount.toFixed(2)}€</span>
+        `;
+        right.appendChild(chip);
+      }
+    }
+
+    row.appendChild(left);
+    row.appendChild(right);
+    dayListEl.appendChild(row);
   }
+
+  weekTotalEl.textContent = `Total semaine : ${total.toFixed(2)}€`;
 }
 
-async function saveAccess() {
-  const cbs = Array.from(accessChecksEl.querySelectorAll("input[type='checkbox']"));
-  const codes = cbs.filter(x => x.checked).map(x => x.value);
+// ---------- Date utils (ISO week) ----------
+// Retourne lundi (ISO) de la semaine donnée
+function getISOWeekStartDate(year, week) {
+  // ISO: semaine 1 = semaine contenant le 4 janvier
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = (jan4.getUTCDay() + 6) % 7; // 0=lundi
+  const mondayWeek1 = new Date(jan4);
+  mondayWeek1.setUTCDate(jan4.getUTCDate() - jan4Day);
 
-  saveAccessBtn.disabled = true;
-  saveAccessStatus.textContent = "Enregistrement…";
+  const monday = new Date(mondayWeek1);
+  monday.setUTCDate(mondayWeek1.getUTCDate() + (week - 1) * 7);
 
-  try {
-    await api({
-      action: "setAccess",
-      codeAdmin: ADMIN_CODE,
-      agent: currentAgent,
-      codes: codes.join(",")
-    });
-    saveAccessStatus.textContent = "✅ Sauvegardé";
-  } catch (e) {
-    saveAccessStatus.textContent = "❌ " + (e?.message || e);
-  } finally {
-    saveAccessBtn.disabled = false;
-    setTimeout(() => (saveAccessStatus.textContent = ""), 2500);
-  }
+  // repasse en local sans casser le YYYY-MM-DD
+  return new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate());
 }
 
-async function addPrimeAdmin() {
-  const dateISO = primeDateEl.value;
-  const code = primeCodeEl.value;
-  const comment = primeCommentEl.value || "";
+function getISOWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
 
-  if (!dateISO || !code) { alert("Choisis une date et une prime."); return; }
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
 
-  try {
-    await api({
-      action: "addPrime",
-      codeAdmin: ADMIN_CODE,
-      agent: currentAgent,
-      date: dateISO,
-      code,
-      comment
-    });
+function toISODate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
-    primeCommentEl.value = "";
+function dayNameFR(date) {
+  return ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"][((date.getDay()+6)%7)];
+}
 
-    const v = calendar.view;
-    await refreshEvents(v.activeStart.toISOString().slice(0,10), v.activeEnd.toISOString().slice(0,10));
-    await refreshMonthTotal(v.currentStart);
-  } catch (e) {
-    alert("Erreur: " + (e?.message || e));
-  }
+function formatFR(date) {
+  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
