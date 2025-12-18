@@ -5,7 +5,7 @@
   --text:#111111;
   --muted:#4b4b4b;
 
-  --violet:#7C3AED;      /* violet boutons */
+  --violet:#7C3AED;      /* violet */
   --violet-2:#6D28D9;
   --border: rgba(0,0,0,.10);
   --shadow: 0 8px 24px rgba(0,0,0,.08);
@@ -28,7 +28,8 @@ header{
   z-index: 30;
   background: var(--header);
   padding: 14px 16px;
-  font-weight: 950;
+  font-weight: 1000;
+  letter-spacing: .6px;
   box-shadow: 0 6px 18px rgba(0,0,0,.08);
 }
 
@@ -52,8 +53,8 @@ header{
 .muted{ color: var(--muted); opacity: .9; }
 .small{ font-size: 13px; }
 
-.title{ font-size:18px; font-weight:950; }
-.subtitle{ font-size:16px; font-weight:950; }
+.title{ font-size:18px; font-weight:1000; }
+.subtitle{ font-size:16px; font-weight:1000; }
 
 .topbar{
   display:flex;
@@ -70,7 +71,7 @@ header{
   border: 1px solid var(--border);
   padding: 8px 12px;
   border-radius: 999px;
-  font-weight: 950;
+  font-weight: 1000;
 }
 
 /* boutons généraux */
@@ -80,7 +81,7 @@ button, .btn{
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   cursor:pointer;
-  font-weight: 950;
+  font-weight: 1000;
   transition: transform .12s ease, filter .12s ease;
 }
 button:hover, .btn:hover{ transform: translateY(-1px); }
@@ -91,6 +92,37 @@ select, input{
   border: 1px solid rgba(0,0,0,.14);
   background: #fff;
   font-size:14px;
+}
+
+/* ===== LOGO PAGE ACCUEIL ===== */
+.home-logo{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding: 10px 0 4px;
+  text-align:center;
+}
+.logo-text{ line-height:1; }
+.logo-brigade{
+  display:block;
+  font-size: 22px;
+  font-weight: 750;
+  color: var(--violet);
+  letter-spacing: .6px;
+}
+.logo-triage{
+  display:block;
+  font-size: 40px;
+  font-weight: 1100;
+  color: var(--violet);
+  letter-spacing: 2px;
+}
+.logo-sub{
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
 }
 
 /* ====== Agents: disposition 2 / 3 / 3 ====== */
@@ -127,11 +159,12 @@ select, input{
   justify-content:space-between;
   gap:12px;
   padding: 14px 14px;
+  border-radius: var(--radius-sm);
 }
 .agent-tile .left{ display:flex; flex-direction:column; gap:3px; }
-.agent-tile .name{ font-weight: 1000; letter-spacing:.2px; }
-.agent-tile .hint{ font-size: 12px; opacity: .9; font-weight: 700; }
-.agent-tile .arrow{ opacity:.95; font-weight: 1000; }
+.agent-tile .name{ font-weight: 1100; letter-spacing:.2px; }
+.agent-tile .hint{ font-size: 12px; opacity: .92; font-weight: 750; }
+.agent-tile .arrow{ opacity:.95; font-weight: 1200; }
 
 /* liste jours */
 .daylist{ display:flex; flex-direction:column; gap:10px; }
@@ -148,7 +181,7 @@ select, input{
 }
 
 .dayleft{ min-width: 240px; }
-.dayname{ font-weight: 950; }
+.dayname{ font-weight: 1000; }
 .daydate{ opacity:.75; font-size: 13px; margin-top:2px; }
 
 .rightcol{ display:flex; flex-direction:column; gap:10px; align-items:flex-end; flex:1; }
@@ -164,7 +197,7 @@ select, input{
   background: rgba(124,58,237,.08);
 }
 .icon{ font-size: 18px; }
-.amount{ font-weight: 950; }
+.amount{ font-weight: 1000; }
 
 /* admin panel */
 .admin-panel{
@@ -188,13 +221,13 @@ button.action{
   background: linear-gradient(135deg, var(--violet), var(--violet-2));
   border: none;
   color:#fff;
-  font-weight: 1000;
+  font-weight: 1100;
 }
 button.danger{
   background:#fff;
   border:1px solid rgba(160,60,60,.25);
   color:#6f1e1e;
-  font-weight: 1000;
+  font-weight: 1100;
 }
 
 /* bouton admin caché (au-dessus de la légende) */
@@ -221,13 +254,13 @@ button.danger{
   bottom: 0;
   z-index: 40;
   background: linear-gradient(135deg, var(--violet), var(--violet-2));
-  color: #000;                 /* texte noir demandé */
+  color: #000;
   padding: 10px 12px;
   box-shadow: 0 -10px 30px rgba(0,0,0,.10);
 }
 
 .legend-title{
-  font-weight: 1000;
+  font-weight: 1100;
   font-size: 13px;
   margin-bottom: 6px;
   opacity: .95;
@@ -248,9 +281,9 @@ button.danger{
   padding: 8px 10px;
   border-radius: 999px;
   border: 1px solid rgba(0,0,0,.20);
-  background: rgba(255,255,255,.75); /* pour garder le texte noir lisible */
+  background: rgba(255,255,255,.75);
   font-size: 13px;
-  font-weight: 950;
+  font-weight: 1000;
 }
 
 .legend-icon{ font-size: 18px; }
