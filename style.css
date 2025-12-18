@@ -40,14 +40,30 @@ select, input {
 }
 button.action { background:var(--sage); border:none; color:#fff; font-weight:950; }
 
-code { background:#eef2ea; padding:2px 6px; border-radius:8px; }
-
-.icons .btn { padding:12px; }
-.icon-box { display:flex; flex-direction:column; gap:6px; }
-.icon-big { font-size:26px; }
-
 .checks { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; }
 .check { display:flex; gap:10px; align-items:center; padding:10px; border:1px solid #e5e7e4; border-radius:14px; background:#fff; }
 .check input { width:18px; height:18px; }
 .check .label { font-weight:900; }
 .check .sub { opacity:.75; font-size:13px; }
+
+.notice {
+  padding:12px;
+  border:1px solid #e5e7e4;
+  border-radius:14px;
+  background:#fff;
+}
+
+/* Bouton admin discret */
+.admin-hidden-btn{
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: #000;
+  opacity: .14;
+  cursor: pointer;
+}
+.admin-hidden-btn:hover{ opacity:.35; }

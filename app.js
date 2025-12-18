@@ -1,12 +1,36 @@
 // ===== CONFIG =====
-const API_URL = "https://script.google.com/macros/s/AKfycbyh7YY2zSRfHhOUp5jk_cJmR9KPWqJcXUoCDtnOBXEIw0Bdj9WaU1P1UOc5kw4hmzTx/exec";
-const IS_ADMIN = new URLSearchParams(window.location.search).get("admin") === "1";
+const API_URL = "https://script.google.com/macros/s/AKfycbx94ffDuY0bSr1TYRHrI71c70L-_6icRs9fgXTZOB_hOeFV0lAnSPmsPUAVDnFrliw/exec";
+const ADMIN_CODE = "1234"; // 🔴 doit matcher Code.gs
 
 // ===== STATE =====
 let BOOT = null;
 let currentAgent = null;
 let calendar = null;
-let ALLOWED_CODES = new Set(); // pour les agents
+let isAdmin = false; // bascule via bouton caché
+
+// ===== DOM =====
+const homeEl = document.getElementById("home");
+const agentViewEl = document.getElementById("agentView");
+
+const agentButtonsEl = document.getElementById("agentButtons");
+const agentNameEl = document.getElementById("agentName");
+const monthTotalEl = document.getElementById("monthTotal");
+
+const adminFormEl = document.getElementById("adminForm");
+const primeDateEl = document.getElementById("primeDate");
+const primeCodeEl = document.getElementById("primeCode");
+const primeCommentEl = document.getElementById("primeComment");
+
+const adminAccessCardEl = document.getElementById("adminAccessCard");
+const accessChecksEl = document.getElementById("accessChecks");
+const saveAccessBtn = document.getElementById("saveAccessBtn");
+const saveAccessStatus = document.getElementById("saveAccessStatus");
+
+const modeBadgeEl = document.getElementById("modeBadge");
+const backBtn = document.getElementById("backBtn");
+const adminHiddenBtn = document.getElementById("adminHiddenBtn");
+
+backBtn.addEventListener("click", goHome);
 
 // ===== JSONP (anti-CORS) =====
 function jsonp(url, timeoutMs = 15000) {
@@ -14,7 +38,7 @@ function jsonp(url, timeoutMs = 15000) {
     const cbName = "cb_" + Math.random().toString(36).slice(2);
     const script = document.createElement("script");
     const sep = url.includes("?") ? "&" : "?";
-    const finalUrl = `${url}${sep}callback=${cbName}`;
+    script.src = `${url}${sep}callback=${cbName}`;
 
     let done = false;
     const timer = setTimeout(() => {
@@ -44,7 +68,6 @@ function jsonp(url, timeoutMs = 15000) {
       reject(new Error("JSONP load error"));
     };
 
-    script.src = finalUrl;
     document.body.appendChild(script);
   });
 }
@@ -56,48 +79,33 @@ async function api(params) {
   return data;
 }
 
-// ===== DOM =====
-const homeEl = document.getElementById("home");
-const agentViewEl = document.getElementById("agentView");
-
-const agentButtonsEl = document.getElementById("agentButtons");
-const agentNameEl = document.getElementById("agentName");
-const monthTotalEl = document.getElementById("monthTotal");
-
-const adminFormEl = document.getElementById("adminForm");
-const agentFormEl = document.getElementById("agentForm");
-
-const primeDateEl = document.getElementById("primeDate");
-const primeCodeEl = document.getElementById("primeCode");
-const primeCommentEl = document.getElementById("primeComment");
-
-const primeDateAgentEl = document.getElementById("primeDateAgent");
-const primeIconsEl = document.getElementById("primeIcons");
-
-const adminAccessCardEl = document.getElementById("adminAccessCard");
-const accessChecksEl = document.getElementById("accessChecks");
-const saveAccessBtn = document.getElementById("saveAccessBtn");
-const saveAccessStatus = document.getElementById("saveAccessStatus");
-
-document.getElementById("backBtn").addEventListener("click", goHome);
-document.getElementById("modeBadge").textContent = `Mode : ${IS_ADMIN ? "Admin" : "Agent"}`;
-
-if (IS_ADMIN) {
-  document.getElementById("addBtn").addEventListener("click", addPrimeAdmin);
-  saveAccessBtn.addEventListener("click", saveAccess);
-}
-
-// ===== BOOT =====
-boot();
+// ===== INIT =====
+boot().catch(showBootError);
 
 async function boot() {
+  setMode(false); // agent par défaut
   BOOT = await api({ action: "bootstrap" });
   renderHome();
-  fillPrimeSelect();
+  setupAdminButton();
+}
 
-  adminFormEl.classList.toggle("hidden", !IS_ADMIN);
-  agentFormEl.classList.toggle("hidden", IS_ADMIN);
-  adminAccessCardEl.classList.toggle("hidden", !IS_ADMIN);
+function showBootError(err) {
+  console.error(err);
+  agentButtonsEl.innerHTML = `
+    <div class="notice">
+      <b>Erreur chargement</b><br/>
+      ${String(err?.message || err)}
+    </div>
+  `;
+}
+
+function setMode(admin) {
+  isAdmin = admin;
+  modeBadgeEl.textContent = `Mode : ${isAdmin ? "Admin" : "Agent"}`;
+
+  // UI admin visible uniquement si admin
+  adminFormEl.classList.toggle("hidden", !isAdmin);
+  adminAccessCardEl.classList.toggle("hidden", !isAdmin);
 }
 
 // ===== HOME =====
@@ -130,11 +138,12 @@ function goHome() {
   currentAgent = null;
 
   if (calendar) { calendar.destroy(); calendar = null; }
-  ALLOWED_CODES = new Set();
-  accessChecksEl.innerHTML = "";
+
   saveAccessStatus.textContent = "";
+  accessChecksEl.innerHTML = "";
 }
 
+// ===== AGENT VIEW =====
 async function openAgent(agent) {
   currentAgent = agent;
   agentNameEl.textContent = agent;
@@ -142,39 +151,86 @@ async function openAgent(agent) {
   homeEl.classList.add("hidden");
   agentViewEl.classList.remove("hidden");
 
-  // default date
-  if (IS_ADMIN) {
-    primeDateEl.valueAsDate = new Date();
-  } else {
-    primeDateAgentEl.valueAsDate = new Date();
-  }
-
-  // Charge accès + UI accès
-  if (IS_ADMIN) {
-    await loadAccessForAdminUI();
-  } else {
-    await loadAllowedForAgent();
-    renderAgentIcons();
-  }
-
   initCalendar();
+
+  // admin features
+  if (isAdmin) {
+    primeDateEl.valueAsDate = new Date();
+    fillPrimeSelect();
+    wireAdminButtons();
+    await loadAccessUI();
+  }
+
+  // refresh initial
+  const v = calendar.view;
+  await refreshEvents(v.activeStart.toISOString().slice(0,10), v.activeEnd.toISOString().slice(0,10));
+  await refreshMonthTotal(v.currentStart);
 }
 
-// ===== ACCESS =====
-async function loadAllowedForAgent() {
-  const res = await api({ action: "allowed", agent: currentAgent });
-  ALLOWED_CODES = new Set(res.codes || []);
+function initCalendar() {
+  const el = document.getElementById("calendar");
+  if (calendar) { calendar.destroy(); calendar = null; }
+
+  calendar = new FullCalendar.Calendar(el, {
+    initialView: "dayGridMonth",
+    height: "auto",
+    firstDay: 1,
+    headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth" },
+    datesSet: async (info) => {
+      await refreshEvents(info.startStr, info.endStr);
+      await refreshMonthTotal(info.view.currentStart);
+    }
+  });
+  calendar.render();
 }
 
-async function loadAccessForAdminUI() {
+async function refreshEvents(startStr, endStr) {
+  const res = await api({ action: "events", agent: currentAgent, start: startStr, end: endStr });
+  calendar.removeAllEvents();
+  (res.events || []).forEach(e => calendar.addEvent(e));
+}
+
+async function refreshMonthTotal(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = dateObj.getMonth() + 1;
+  const res = await api({ action: "monthTotal", agent: currentAgent, year: String(y), month: String(m) });
+  monthTotalEl.textContent = `Total mois : ${Number(res.total).toFixed(2)}€`;
+}
+
+// ===== ADMIN MODE (hidden button) =====
+function setupAdminButton() {
+  adminHiddenBtn.addEventListener("click", () => {
+    const code = prompt("Code admin ?");
+    if (code === null) return;
+
+    if (code === ADMIN_CODE) {
+      setMode(true);
+      alert("Mode admin activé");
+      // si on est déjà dans la vue agent, on recharge l'UI admin
+      if (currentAgent) openAgent(currentAgent);
+    } else {
+      alert("Code incorrect");
+    }
+  });
+}
+
+function wireAdminButtons() {
+  // éviter multi-bind
+  const addBtn = document.getElementById("addBtn");
+  addBtn.onclick = addPrimeAdmin;
+  saveAccessBtn.onclick = saveAccess;
+}
+
+async function loadAccessUI() {
   saveAccessStatus.textContent = "";
   const res = await api({ action: "allowed", agent: currentAgent });
   const allowed = new Set(res.codes || []);
 
   accessChecksEl.innerHTML = "";
   const entries = Object.entries(BOOT.primeTypes || {}).sort((a,b) => a[0].localeCompare(b[0]));
+
   for (const [code, p] of entries) {
-    const icon = (BOOT.icons && BOOT.icons[code]) ? BOOT.icons[code] : "🔖";
+    const icon = BOOT.icons?.[code] || "🔖";
     const wrap = document.createElement("label");
     wrap.className = "check";
 
@@ -203,100 +259,21 @@ async function saveAccess() {
   saveAccessStatus.textContent = "Enregistrement…";
 
   try {
-    await api({ action: "setAccess", agent: currentAgent, codes: codes.join(",") });
+    await api({
+      action: "setAccess",
+      codeAdmin: ADMIN_CODE,
+      agent: currentAgent,
+      codes: codes.join(",")
+    });
     saveAccessStatus.textContent = "✅ Sauvegardé";
   } catch (e) {
-    saveAccessStatus.textContent = "❌ Erreur : " + (e?.message || e);
+    saveAccessStatus.textContent = "❌ " + (e?.message || e);
   } finally {
     saveAccessBtn.disabled = false;
-    setTimeout(() => (saveAccessStatus.textContent = ""), 3000);
+    setTimeout(() => (saveAccessStatus.textContent = ""), 2500);
   }
 }
 
-// ===== AGENT ICONS =====
-function renderAgentIcons() {
-  primeIconsEl.innerHTML = "";
-
-  const entries = Object.entries(BOOT.primeTypes || {}).sort((a,b) => a[0].localeCompare(b[0]));
-  for (const [code, p] of entries) {
-    // filtre autorisations
-    if (ALLOWED_CODES.size > 0 && !ALLOWED_CODES.has(code)) continue;
-
-    const icon = (BOOT.icons && BOOT.icons[code]) ? BOOT.icons[code] : "🔖";
-
-    const b = document.createElement("button");
-    b.className = "btn";
-    b.innerHTML = `
-      <div class="icon-box">
-        <div class="icon-big">${icon}</div>
-        <div style="font-weight:950">${p.label}</div>
-        <div class="muted small">${Number(p.montant).toFixed(2)}€</div>
-      </div>
-    `;
-
-    b.onclick = async () => {
-      const dateISO = primeDateAgentEl.value;
-      if (!dateISO) { alert("Choisis une date"); return; }
-
-      try {
-        await api({ action: "addPrime", agent: currentAgent, date: dateISO, code });
-        await refreshAfterAdd();
-      } catch (e) {
-        alert("Erreur: " + (e?.message || e));
-      }
-    };
-
-    primeIconsEl.appendChild(b);
-  }
-
-  if (primeIconsEl.children.length === 0) {
-    primeIconsEl.innerHTML = `<div class="muted small">Aucune prime attribuée à cet agent (admin).</div>`;
-  }
-}
-
-// ===== CALENDAR =====
-function initCalendar() {
-  const el = document.getElementById("calendar");
-  if (calendar) { calendar.destroy(); calendar = null; }
-
-  calendar = new FullCalendar.Calendar(el, {
-    initialView: "dayGridMonth",
-    height: "auto",
-    firstDay: 1,
-    headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth" },
-    datesSet: async (info) => {
-      await refreshEvents(info.startStr, info.endStr);
-      await refreshMonthTotal(info.view.currentStart);
-    }
-  });
-
-  calendar.render();
-
-  const v = calendar.view;
-  refreshEvents(v.activeStart.toISOString().slice(0,10), v.activeEnd.toISOString().slice(0,10));
-  refreshMonthTotal(v.currentStart);
-}
-
-async function refreshEvents(startStr, endStr) {
-  const res = await api({ action: "events", agent: currentAgent, start: startStr, end: endStr });
-  calendar.removeAllEvents();
-  (res.events || []).forEach(e => calendar.addEvent(e));
-}
-
-async function refreshMonthTotal(dateObj) {
-  const y = dateObj.getFullYear();
-  const m = dateObj.getMonth() + 1;
-  const res = await api({ action: "monthTotal", agent: currentAgent, year: String(y), month: String(m) });
-  monthTotalEl.textContent = `Total mois : ${Number(res.total).toFixed(2)}€`;
-}
-
-async function refreshAfterAdd() {
-  const v = calendar.view;
-  await refreshEvents(v.activeStart.toISOString().slice(0,10), v.activeEnd.toISOString().slice(0,10));
-  await refreshMonthTotal(v.currentStart);
-}
-
-// ===== ADMIN ADD PRIME =====
 async function addPrimeAdmin() {
   const dateISO = primeDateEl.value;
   const code = primeCodeEl.value;
@@ -305,9 +282,20 @@ async function addPrimeAdmin() {
   if (!dateISO || !code) { alert("Choisis une date et une prime."); return; }
 
   try {
-    await api({ action: "addPrime", agent: currentAgent, date: dateISO, code, comment });
+    await api({
+      action: "addPrime",
+      codeAdmin: ADMIN_CODE,
+      agent: currentAgent,
+      date: dateISO,
+      code,
+      comment
+    });
+
     primeCommentEl.value = "";
-    await refreshAfterAdd();
+
+    const v = calendar.view;
+    await refreshEvents(v.activeStart.toISOString().slice(0,10), v.activeEnd.toISOString().slice(0,10));
+    await refreshMonthTotal(v.currentStart);
   } catch (e) {
     alert("Erreur: " + (e?.message || e));
   }
