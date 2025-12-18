@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Suivi Primes Brigade</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="header-row">
+      <div>Suivi primes — Brigade</div>
+      <div class="header-badge" id="modeBadge">Mode : —</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- HOME -->
+    <section id="home" class="card">
+      <div class="topbar">
+        <div>
+          <div class="title">Accueil</div>
+          <div class="muted">Choisis un agent</div>
+        </div>
+        <div class="muted small">
+          Admin : ajoute <code>?admin=1</code> à l’URL
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div id="agentButtons" class="grid"></div>
+    </section>
+
+    <!-- AGENT VIEW -->
+    <section id="agentView" class="hidden">
+      <div class="topbar">
+        <div class="row">
+          <button id="backBtn">← Retour</button>
+          <div class="pill" id="agentName"></div>
+          <div class="pill" id="monthTotal">Total mois : —</div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <!-- ADMIN: attribution primes -->
+      <div id="adminAccessCard" class="card hidden">
+        <div class="subtitle">Admin — Attribuer les primes à l’agent</div>
+        <div class="muted small">Coche les primes autorisées pour cet agent, puis enregistre.</div>
+        <div class="spacer"></div>
+        <div id="accessChecks" class="checks"></div>
+        <div class="spacer"></div>
+        <div class="row">
+          <button class="action" id="saveAccessBtn">Enregistrer l’attribution</button>
+          <span class="muted small" id="saveAccessStatus"></span>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <!-- ADD PRIME -->
+      <div class="card">
+        <div class="subtitle">Ajouter une prime</div>
+
+        <!-- ADMIN FORM -->
+        <div id="adminForm" class="row hidden">
+          <input type="date" id="primeDate" />
+          <select id="primeCode"></select>
+          <input type="text" id="primeComment" placeholder="Commentaire (optionnel)" />
+          <button class="action" id="addBtn">Ajouter</button>
+        </div>
+
+        <!-- AGENT FORM -->
+        <div id="agentForm" class="row hidden">
+          <input type="date" id="primeDateAgent" />
+          <div id="primeIcons" class="grid icons"></div>
+        </div>
+
+        <div class="muted small" style="margin-top:8px;">
+          Les primes sont enregistrées dans Google Sheet.
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="card">
+        <div id="calendar"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
