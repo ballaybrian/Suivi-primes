@@ -136,7 +136,7 @@ function renderHome() {
     b.innerHTML = `
       <div class="left">
         <div class="name">${agent}</div>
-        <div class="hint">Voir le planning de la semaine</div>
+        <div class="hint">Prime Semaine</div>
       </div>
       <div class="arrow">→</div>
     `;
