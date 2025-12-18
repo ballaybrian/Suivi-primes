@@ -137,8 +137,12 @@ select, input{
   gap:12px;
 }
 
-.agent-row.two{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.agent-row.three{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.agent-row.two,
+.agent-row.three{
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  justify-items: center;
+}
+
 
 /* responsive mobile */
 @media (max-width: 720px){
@@ -287,3 +291,16 @@ button.danger{
 }
 
 .legend-icon{ font-size: 18px; }
+/* ===== UNIFORMISATION TUILES AGENTS ===== */
+
+/* largeur max identique pour toutes les tuiles */
+.agent-tile{
+  max-width: 300px;
+  width: 100%;
+}
+
+/* centre les tuiles quand la ligne n'est pas pleine */
+.agent-row{
+  justify-content: center;
+}
+
