@@ -48,9 +48,7 @@ function jsonp(url, timeoutMs = 15000) {
 async function api(params) {
   const qs = new URLSearchParams(params).toString();
   const data = await jsonp(`${API_URL}?${qs}`);
-  if (!data || data.ok !== true) {
-    throw new Error(data?.error || "API error");
-  }
+  if (!data || data.ok !== true) throw new Error(data?.error || "API error");
   return data;
 }
 
@@ -90,26 +88,8 @@ boot().catch(showBootError);
 async function boot() {
   BOOT = await api({ action: "bootstrap" });
   renderHome();
-renderLegend();
-function renderLegend() {
-  const legendItemsEl = document.getElementById("legendItems");
-  if (!legendItemsEl) return;
-
-  legendItemsEl.innerHTML = "";
-
-  Object.entries(BOOT.primeTypes).forEach(([code, p]) => {
-    const item = document.createElement("div");
-    item.className = "legend-item";
-    item.innerHTML = `
-      <span class="legend-icon">${BOOT.icons[code] || "🔖"}</span>
-      <span>${p.label}</span>
-      <span>— ${p.montant.toFixed(2)}€</span>
-    `;
-    legendItemsEl.appendChild(item);
-  });
-}
-
   initYearWeekSelectors();
+  renderLegend();
 
   backBtn.onclick = goHome;
   prevWeekBtn.onclick = () => shiftWeek(-1);
@@ -119,12 +99,14 @@ function renderLegend() {
 
   adminBtn.onclick = () => {
     const code = prompt("Code admin ?");
+    if (code === null) return;
+
     if (code === ADMIN_CODE) {
       isAdmin = true;
       sessionStorage.setItem("isAdmin", "1");
       alert("Mode admin activé");
       refreshWeek();
-    } else if (code !== null) {
+    } else {
       alert("Code incorrect");
     }
   };
@@ -168,6 +150,28 @@ function goHome() {
 }
 
 /*************************************************
+ * LÉGENDE
+ *************************************************/
+function renderLegend() {
+  const legendItemsEl = document.getElementById("legendItems");
+  if (!legendItemsEl) return;
+
+  legendItemsEl.innerHTML = "";
+  const entries = Object.entries(BOOT.primeTypes).sort((a,b) => a[0].localeCompare(b[0]));
+
+  for (const [code, p] of entries) {
+    const item = document.createElement("div");
+    item.className = "legend-item";
+    item.innerHTML = `
+      <span class="legend-icon">${BOOT.icons?.[code] || "🔖"}</span>
+      <span>${p.label}</span>
+      <span>— ${Number(p.montant).toFixed(2)}€</span>
+    `;
+    legendItemsEl.appendChild(item);
+  }
+}
+
+/*************************************************
  * YEAR / WEEK
  *************************************************/
 function initYearWeekSelectors() {
@@ -177,8 +181,8 @@ function initYearWeekSelectors() {
   yearSelect.innerHTML = "";
   [y - 1, y, y + 1].forEach(yy => {
     const o = document.createElement("option");
-    o.value = yy;
-    o.textContent = yy;
+    o.value = String(yy);
+    o.textContent = String(yy);
     if (yy === y) o.selected = true;
     yearSelect.appendChild(o);
   });
@@ -186,12 +190,12 @@ function initYearWeekSelectors() {
   weekSelect.innerHTML = "";
   for (let w = 1; w <= 52; w++) {
     const o = document.createElement("option");
-    o.value = w;
+    o.value = String(w);
     o.textContent = `Semaine ${w}`;
     weekSelect.appendChild(o);
   }
 
-  weekSelect.value = Math.min(52, getISOWeekNumber(now));
+  weekSelect.value = String(Math.min(52, Math.max(1, getISOWeekNumber(now))));
 }
 
 function shiftWeek(delta) {
@@ -202,21 +206,21 @@ function shiftWeek(delta) {
   if (w > 52) { w = 1; y++; }
 
   ensureYearOption(y);
-  yearSelect.value = y;
-  weekSelect.value = w;
+  yearSelect.value = String(y);
+  weekSelect.value = String(w);
   refreshWeek();
 }
 
 function ensureYearOption(y) {
   if ([...yearSelect.options].some(o => Number(o.value) === y)) return;
   const o = document.createElement("option");
-  o.value = y;
-  o.textContent = y;
+  o.value = String(y);
+  o.textContent = String(y);
   yearSelect.appendChild(o);
 }
 
 /*************************************************
- * CORE : WEEK DISPLAY
+ * CORE : WEEK DISPLAY + ADMIN RESET
  *************************************************/
 async function refreshWeek() {
   if (!currentAgent) return;
@@ -224,20 +228,18 @@ async function refreshWeek() {
   const year = Number(yearSelect.value);
   const week = Number(weekSelect.value);
 
-  const start = getISOWeekStartDate(year, week);
-  const end = addDays(start, 7);
+  const start = getISOWeekStartDate(year, week); // lundi
+  const end = addDays(start, 7);                 // exclu
+
+  const startISO = toISO(start);
+  const endISO = toISO(end);
 
   weekLabel.textContent = `Semaine ${week} — ${year}` + (isAdmin ? " (Admin)" : "");
   rangeLabel.textContent = `${formatFR(start)} → ${formatFR(addDays(end, -1))}`;
 
-  const res = await api({
-    action: "weekPlan",
-    agent: currentAgent,
-    start: toISO(start),
-    end: toISO(end)
-  });
+  const res = await api({ action: "weekPlan", agent: currentAgent, start: startISO, end: endISO });
+  const plan = res.plan || {}; // { "YYYY-MM-DD": ["ATTX","TCA"] }
 
-  const plan = res.plan || {};
   dayListEl.innerHTML = "";
   let totalWeek = 0;
 
@@ -248,7 +250,6 @@ async function refreshWeek() {
 
     const row = document.createElement("div");
     row.className = "dayrow";
-
     row.innerHTML = `
       <div class="dayleft">
         <div class="dayname">${dayNameFR(d)}</div>
@@ -258,6 +259,8 @@ async function refreshWeek() {
     `;
 
     const right = row.querySelector(".rightcol");
+
+    // Affichage chips
     const chips = document.createElement("div");
     chips.className = "chips";
 
@@ -265,25 +268,27 @@ async function refreshWeek() {
     if (codes.length === 0) {
       chips.innerHTML = `<span class="muted">—</span>`;
     } else {
-      codes.forEach(code => {
-        const p = BOOT.primeTypes[code];
-        if (!p) return;
-        totalDay += p.montant;
+      for (const code of codes) {
+        const p = BOOT.primeTypes?.[code];
+        if (!p) continue;
+        const amount = Number(p.montant || 0);
+        totalDay += amount;
 
         const chip = document.createElement("div");
         chip.className = "chip";
+        chip.title = p.label || code;
         chip.innerHTML = `
-          <span class="icon">${BOOT.icons[code] || "🔖"}</span>
-          <span class="amount">${p.montant.toFixed(2)}€</span>
+          <span class="icon">${BOOT.icons?.[code] || "🔖"}</span>
+          <span class="amount">${amount.toFixed(2)}€</span>
         `;
         chips.appendChild(chip);
-      });
+      }
     }
-
     totalWeek += totalDay;
+
     right.appendChild(chips);
 
-    // ADMIN PANEL
+    // Admin panel (checkbox + save + reset day)
     if (isAdmin) {
       const panel = document.createElement("div");
       panel.className = "admin-panel";
@@ -291,7 +296,8 @@ async function refreshWeek() {
       const checks = document.createElement("div");
       checks.className = "checks";
 
-      Object.entries(BOOT.primeTypes).forEach(([code, p]) => {
+      const entries = Object.entries(BOOT.primeTypes).sort((a,b) => a[0].localeCompare(b[0]));
+      for (const [code, p] of entries) {
         const lab = document.createElement("label");
         lab.className = "check";
 
@@ -300,40 +306,122 @@ async function refreshWeek() {
         cb.value = code;
         cb.checked = codes.includes(code);
 
+        const txt = document.createElement("span");
+        txt.textContent = `${BOOT.icons?.[code] || "🔖"} ${code} — ${p.label} (${Number(p.montant).toFixed(2)}€)`;
+
         lab.appendChild(cb);
-        lab.append(` ${BOOT.icons[code] || ""} ${code} — ${p.label}`);
+        lab.appendChild(txt);
         checks.appendChild(lab);
-      });
+      }
 
-      const btn = document.createElement("button");
-      btn.className = "action";
-      btn.textContent = "Enregistrer ce jour";
+      const actions = document.createElement("div");
+      actions.className = "row";
+      actions.style.marginTop = "10px";
 
-      btn.onclick = async () => {
-        const selected = [...checks.querySelectorAll("input")]
-          .filter(c => c.checked)
-          .map(c => c.value);
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "action";
+      saveBtn.textContent = "Enregistrer ce jour";
 
-        await api({
-          action: "setDayPlan",
-          codeAdmin: ADMIN_CODE,
-          agent: currentAgent,
-          date: dISO,
-          codes: selected.join(",")
-        });
+      const resetDayBtn = document.createElement("button");
+      resetDayBtn.className = "danger";
+      resetDayBtn.textContent = "Réinitialiser ce jour";
 
-        refreshWeek();
+      const status = document.createElement("span");
+      status.className = "muted small";
+
+      saveBtn.onclick = async () => {
+        const selected = [...checks.querySelectorAll("input[type='checkbox']")]
+          .filter(x => x.checked).map(x => x.value);
+
+        saveBtn.disabled = true;
+        resetDayBtn.disabled = true;
+        status.textContent = "Enregistrement…";
+
+        try {
+          await api({
+            action: "setDayPlan",
+            codeAdmin: ADMIN_CODE,
+            agent: currentAgent,
+            date: dISO,
+            codes: selected.join(",")
+          });
+          status.textContent = "✅ OK";
+          await refreshWeek();
+        } catch (e) {
+          status.textContent = "❌ " + (e?.message || e);
+        } finally {
+          saveBtn.disabled = false;
+          resetDayBtn.disabled = false;
+          setTimeout(() => (status.textContent = ""), 2000);
+        }
       };
 
+      resetDayBtn.onclick = async () => {
+        if (!confirm("Réinitialiser TOUTES les primes de ce jour ?")) return;
+
+        resetDayBtn.disabled = true;
+        saveBtn.disabled = true;
+        status.textContent = "Réinitialisation…";
+
+        try {
+          await api({
+            action: "resetDay",
+            codeAdmin: ADMIN_CODE,
+            agent: currentAgent,
+            date: dISO
+          });
+          status.textContent = "✅ Réinitialisé";
+          await refreshWeek();
+        } catch (e) {
+          status.textContent = "❌ " + (e?.message || e);
+        } finally {
+          resetDayBtn.disabled = false;
+          saveBtn.disabled = false;
+          setTimeout(() => (status.textContent = ""), 2000);
+        }
+      };
+
+      actions.appendChild(saveBtn);
+      actions.appendChild(resetDayBtn);
+      actions.appendChild(status);
+
       panel.appendChild(checks);
-      panel.appendChild(btn);
+      panel.appendChild(actions);
       right.appendChild(panel);
     }
 
     dayListEl.appendChild(row);
   }
 
-  weekTotalEl.textContent = `Total semaine : ${totalWeek.toFixed(2)}€`;
+  // Total semaine + reset semaine (admin)
+  if (isAdmin) {
+    weekTotalEl.innerHTML = `
+      Total semaine : ${totalWeek.toFixed(2)}€
+      <button id="resetWeekBtn" class="danger" style="margin-left:10px;padding:8px 10px;border-radius:999px;">Réinitialiser semaine</button>
+    `;
+    const resetWeekBtn = document.getElementById("resetWeekBtn");
+    resetWeekBtn.onclick = async () => {
+      if (!confirm("⚠️ Réinitialiser TOUTE la semaine pour cet agent ?")) return;
+
+      resetWeekBtn.disabled = true;
+      try {
+        await api({
+          action: "resetWeek",
+          codeAdmin: ADMIN_CODE,
+          agent: currentAgent,
+          start: startISO,
+          end: endISO
+        });
+        await refreshWeek();
+      } catch (e) {
+        alert("Erreur: " + (e?.message || e));
+      } finally {
+        resetWeekBtn.disabled = false;
+      }
+    };
+  } else {
+    weekTotalEl.textContent = `Total semaine : ${totalWeek.toFixed(2)}€`;
+  }
 }
 
 /*************************************************
@@ -341,7 +429,7 @@ async function refreshWeek() {
  *************************************************/
 function getISOWeekStartDate(year, week) {
   const jan4 = new Date(Date.UTC(year, 0, 4));
-  const day = (jan4.getUTCDay() + 6) % 7;
+  const day = (jan4.getUTCDay() + 6) % 7; // 0=lundi
   const monday = new Date(jan4);
   monday.setUTCDate(jan4.getUTCDate() - day + (week - 1) * 7);
   return new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate());
@@ -369,5 +457,5 @@ function dayNameFR(d) {
 }
 
 function formatFR(d) {
-  return d.toLocaleDateString("fr-FR");
+  return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"2-digit", year:"numeric" });
 }

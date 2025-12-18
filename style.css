@@ -3,7 +3,7 @@
 body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text); }
 header { background:var(--sage); color:#fff; padding:16px; font-weight:900; }
 
-.wrap { max-width:980px; margin:0 auto; padding:16px; }
+.wrap { max-width:980px; margin:0 auto; padding:16px; padding-bottom: 110px; } /* place pour la légende */
 .card { background:var(--card); border:1px solid #e5e7e4; border-radius:16px; padding:14px; box-shadow:0 2px 10px rgba(0,0,0,.04); }
 .hidden { display:none; }
 
@@ -64,11 +64,12 @@ select, input {
 .check input { width:18px; height:18px; }
 
 button.action { background:var(--sage); border:none; color:#fff; font-weight:950; }
+button.danger { background:#fff; border:1px solid #e8bcbc; color:#7a1f1f; font-weight:950; }
 
-/* bouton admin discret */
+/* bouton admin discret : au-dessus de la légende */
 .admin-hidden-btn{
   position: fixed;
-  bottom: 84px;   /* au-dessus de la légende */
+  bottom: 92px;   /* au-dessus de la légende */
   right: 10px;
   width: 22px;
   height: 22px;
@@ -77,34 +78,31 @@ button.action { background:var(--sage); border:none; color:#fff; font-weight:950
   background: #000;
   opacity: .14;
   cursor: pointer;
-  z-index: 9999;  /* toujours au-dessus */
+  z-index: 9999;
 }
 .admin-hidden-btn:hover{ opacity:.35; }
+
 /* ===== LÉGENDE FIXE ===== */
 .legend {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 0; left: 0; right: 0;
   background: #ffffff;
   border-top: 1px solid #e5e7e4;
   padding: 8px 12px;
   box-shadow: 0 -2px 10px rgba(0,0,0,.05);
   z-index: 20;
 }
-
 .legend-title {
   font-weight: 900;
   font-size: 14px;
   margin-bottom: 6px;
 }
-
 .legend-items {
   display: flex;
   gap: 10px;
   overflow-x: auto;
+  padding-bottom: 2px;
 }
-
 .legend-item {
   display: flex;
   align-items: center;
@@ -115,10 +113,6 @@ button.action { background:var(--sage); border:none; color:#fff; font-weight:950
   border-radius: 999px;
   background: #fafbfa;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
 }
-
-.legend-icon {
-  font-size: 18px;
-}
-
+.legend-icon { font-size: 18px; }
