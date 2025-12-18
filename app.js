@@ -126,13 +126,41 @@ function showBootError(err) {
  *************************************************/
 function renderHome() {
   agentButtonsEl.innerHTML = "";
-  BOOT.agents.forEach(agent => {
+
+  // conteneur des 3 lignes
+  const groups = document.createElement("div");
+  groups.className = "agent-groups";
+
+  const row1 = document.createElement("div");
+  row1.className = "agent-row two";
+
+  const row2 = document.createElement("div");
+  row2.className = "agent-row three";
+
+  const row3 = document.createElement("div");
+  row3.className = "agent-row three";
+
+  // mapping 2 / 3 / 3
+  const rows = [row1, row1, row2, row2, row2, row3, row3, row3];
+
+  BOOT.agents.forEach((agent, idx) => {
     const b = document.createElement("button");
-    b.className = "btn";
-    b.textContent = agent;
+    b.className = "agent-tile";
+    b.innerHTML = `
+      <div class="left">
+        <div class="name">${agent}</div>
+        <div class="hint">Voir le planning de la semaine</div>
+      </div>
+      <div class="arrow">→</div>
+    `;
     b.onclick = () => openAgent(agent);
-    agentButtonsEl.appendChild(b);
+    rows[idx]?.appendChild(b);
   });
+
+  groups.appendChild(row1);
+  groups.appendChild(row2);
+  groups.appendChild(row3);
+  agentButtonsEl.appendChild(groups);
 }
 
 function openAgent(agent) {
