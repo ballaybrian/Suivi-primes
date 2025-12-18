@@ -1,12 +1,17 @@
+/*************************************************
+ * CONFIG
+ *************************************************/
 const API_URL = "https://script.google.com/macros/s/AKfycbx94ffDuY0bSr1TYRHrI71c70L-_6icRs9fgXTZOB_hOeFV0lAnSPmsPUAVDnFrliw/exec";
+const ADMIN_CODE = "1234"; // même code que dans Code.gs
 
-// ---------- JSONP (anti-CORS) ----------
+/*************************************************
+ * JSONP (anti-CORS GitHub Pages)
+ *************************************************/
 function jsonp(url, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
-    const cbName = "cb_" + Math.random().toString(36).slice(2);
+    const cb = "cb_" + Math.random().toString(36).slice(2);
     const script = document.createElement("script");
-    const sep = url.includes("?") ? "&" : "?";
-    script.src = `${url}${sep}callback=${cbName}`;
+    script.src = url + (url.includes("?") ? "&" : "?") + "callback=" + cb;
 
     let done = false;
     const timer = setTimeout(() => {
@@ -18,11 +23,11 @@ function jsonp(url, timeoutMs = 15000) {
 
     function cleanup() {
       clearTimeout(timer);
-      delete window[cbName];
+      delete window[cb];
       script.remove();
     }
 
-    window[cbName] = (data) => {
+    window[cb] = (data) => {
       if (done) return;
       done = true;
       cleanup();
@@ -43,14 +48,17 @@ function jsonp(url, timeoutMs = 15000) {
 async function api(params) {
   const qs = new URLSearchParams(params).toString();
   const data = await jsonp(`${API_URL}?${qs}`);
-  if (!data || data.ok !== true) throw new Error(data?.error || "API error");
+  if (!data || data.ok !== true) {
+    throw new Error(data?.error || "API error");
+  }
   return data;
 }
 
-// ---------- DOM ----------
+/*************************************************
+ * DOM
+ *************************************************/
 const homeEl = document.getElementById("home");
 const weekViewEl = document.getElementById("weekView");
-
 const agentButtonsEl = document.getElementById("agentButtons");
 const agentNameEl = document.getElementById("agentName");
 const backBtn = document.getElementById("backBtn");
@@ -65,31 +73,56 @@ const rangeLabel = document.getElementById("rangeLabel");
 const weekTotalEl = document.getElementById("weekTotal");
 const dayListEl = document.getElementById("dayList");
 
-// ---------- STATE ----------
+const adminBtn = document.getElementById("adminHiddenBtn");
+
+/*************************************************
+ * STATE
+ *************************************************/
 let BOOT = null;
 let currentAgent = null;
+let isAdmin = sessionStorage.getItem("isAdmin") === "1";
 
-// ---------- BOOT ----------
-boot().catch(err => {
-  console.error(err);
-  agentButtonsEl.innerHTML = `<div style="padding:12px;border:1px solid #f2c2c2;background:#fff5f5;border-radius:12px;">
-    <b>Erreur chargement</b><br/>${String(err?.message || err)}
-  </div>`;
-});
+/*************************************************
+ * INIT
+ *************************************************/
+boot().catch(showBootError);
 
 async function boot() {
   BOOT = await api({ action: "bootstrap" });
   renderHome();
-
-  backBtn.addEventListener("click", goHome);
-  prevWeekBtn.addEventListener("click", () => shiftWeek(-1));
-  nextWeekBtn.addEventListener("click", () => shiftWeek(1));
-  yearSelect.addEventListener("change", () => refreshWeek());
-  weekSelect.addEventListener("change", () => refreshWeek());
-
   initYearWeekSelectors();
+
+  backBtn.onclick = goHome;
+  prevWeekBtn.onclick = () => shiftWeek(-1);
+  nextWeekBtn.onclick = () => shiftWeek(1);
+  yearSelect.onchange = refreshWeek;
+  weekSelect.onchange = refreshWeek;
+
+  adminBtn.onclick = () => {
+    const code = prompt("Code admin ?");
+    if (code === ADMIN_CODE) {
+      isAdmin = true;
+      sessionStorage.setItem("isAdmin", "1");
+      alert("Mode admin activé");
+      refreshWeek();
+    } else if (code !== null) {
+      alert("Code incorrect");
+    }
+  };
 }
 
+function showBootError(err) {
+  console.error(err);
+  agentButtonsEl.innerHTML = `
+    <div style="padding:12px;border:1px solid #f2c2c2;background:#fff5f5;border-radius:12px;">
+      <b>Erreur chargement</b><br/>${String(err?.message || err)}
+    </div>
+  `;
+}
+
+/*************************************************
+ * HOME
+ *************************************************/
 function renderHome() {
   agentButtonsEl.innerHTML = "";
   BOOT.agents.forEach(agent => {
@@ -101,198 +134,221 @@ function renderHome() {
   });
 }
 
+function openAgent(agent) {
+  currentAgent = agent;
+  agentNameEl.textContent = agent;
+  homeEl.classList.add("hidden");
+  weekViewEl.classList.remove("hidden");
+  refreshWeek();
+}
+
 function goHome() {
   currentAgent = null;
   homeEl.classList.remove("hidden");
   weekViewEl.classList.add("hidden");
 }
 
-// ---------- YEAR / WEEK ----------
+/*************************************************
+ * YEAR / WEEK
+ *************************************************/
 function initYearWeekSelectors() {
   const now = new Date();
   const y = now.getFullYear();
 
-  // années: y-1, y, y+1 (modifiable)
   yearSelect.innerHTML = "";
   [y - 1, y, y + 1].forEach(yy => {
-    const opt = document.createElement("option");
-    opt.value = String(yy);
-    opt.textContent = String(yy);
-    if (yy === y) opt.selected = true;
-    yearSelect.appendChild(opt);
+    const o = document.createElement("option");
+    o.value = yy;
+    o.textContent = yy;
+    if (yy === y) o.selected = true;
+    yearSelect.appendChild(o);
   });
 
-  // semaines 1..52 (tu m’as demandé 52)
   weekSelect.innerHTML = "";
   for (let w = 1; w <= 52; w++) {
-    const opt = document.createElement("option");
-    opt.value = String(w);
-    opt.textContent = `Semaine ${w}`;
-    weekSelect.appendChild(opt);
+    const o = document.createElement("option");
+    o.value = w;
+    o.textContent = `Semaine ${w}`;
+    weekSelect.appendChild(o);
   }
 
-  // semaine courante ISO approximée
-  const isoWeek = getISOWeekNumber(now);
-  weekSelect.value = String(Math.min(52, Math.max(1, isoWeek)));
-}
-
-function openAgent(agent) {
-  currentAgent = agent;
-  agentNameEl.textContent = agent;
-
-  homeEl.classList.add("hidden");
-  weekViewEl.classList.remove("hidden");
-
-  refreshWeek();
+  weekSelect.value = Math.min(52, getISOWeekNumber(now));
 }
 
 function shiftWeek(delta) {
   let y = Number(yearSelect.value);
-  let w = Number(weekSelect.value);
+  let w = Number(weekSelect.value) + delta;
 
-  w += delta;
-  if (w < 1) { w = 52; y -= 1; }
-  if (w > 52) { w = 1; y += 1; }
+  if (w < 1) { w = 52; y--; }
+  if (w > 52) { w = 1; y++; }
 
-  // si année pas dans la liste, on l’ajoute
   ensureYearOption(y);
-  yearSelect.value = String(y);
-  weekSelect.value = String(w);
-
+  yearSelect.value = y;
+  weekSelect.value = w;
   refreshWeek();
 }
 
 function ensureYearOption(y) {
-  const exists = Array.from(yearSelect.options).some(o => Number(o.value) === y);
-  if (exists) return;
-  const opt = document.createElement("option");
-  opt.value = String(y);
-  opt.textContent = String(y);
-  yearSelect.appendChild(opt);
+  if ([...yearSelect.options].some(o => Number(o.value) === y)) return;
+  const o = document.createElement("option");
+  o.value = y;
+  o.textContent = y;
+  yearSelect.appendChild(o);
 }
 
-// ---------- CORE: afficher la semaine ----------
+/*************************************************
+ * CORE : WEEK DISPLAY
+ *************************************************/
 async function refreshWeek() {
   if (!currentAgent) return;
 
   const year = Number(yearSelect.value);
   const week = Number(weekSelect.value);
 
-  const start = getISOWeekStartDate(year, week); // lundi
-  const end = addDays(start, 7);                 // lundi suivant (exclusif)
+  const start = getISOWeekStartDate(year, week);
+  const end = addDays(start, 7);
 
-  const startISO = toISODate(start);
-  const endISO = toISODate(end);
-
-  weekLabel.textContent = `Semaine ${week} — ${year}`;
+  weekLabel.textContent = `Semaine ${week} — ${year}` + (isAdmin ? " (Admin)" : "");
   rangeLabel.textContent = `${formatFR(start)} → ${formatFR(addDays(end, -1))}`;
 
-  const res = await api({ action: "events", agent: currentAgent, start: startISO, end: endISO });
-  const events = res.events || [];
+  const res = await api({
+    action: "weekPlan",
+    agent: currentAgent,
+    start: toISO(start),
+    end: toISO(end)
+  });
 
-  // Regrouper par date YYYY-MM-DD
-  const byDay = new Map();
-  for (const e of events) {
-    const d = e.start; // YYYY-MM-DD
-    if (!byDay.has(d)) byDay.set(d, []);
-    byDay.get(d).push(e);
-  }
-
-  // Construire 7 jours
+  const plan = res.plan || {};
   dayListEl.innerHTML = "";
-  let total = 0;
+  let totalWeek = 0;
 
   for (let i = 0; i < 7; i++) {
     const d = addDays(start, i);
-    const dISO = toISODate(d);
-    const list = byDay.get(dISO) || [];
+    const dISO = toISO(d);
+    const codes = plan[dISO] || [];
 
     const row = document.createElement("div");
     row.className = "dayrow";
 
-    const left = document.createElement("div");
-    left.className = "dayleft";
-    left.innerHTML = `
-      <div class="dayname">${dayNameFR(d)}</div>
-      <div class="daydate">${formatFR(d)}</div>
+    row.innerHTML = `
+      <div class="dayleft">
+        <div class="dayname">${dayNameFR(d)}</div>
+        <div class="daydate">${formatFR(d)}</div>
+      </div>
+      <div class="rightcol"></div>
     `;
 
-    const right = document.createElement("div");
-    right.className = "icons";
+    const right = row.querySelector(".rightcol");
+    const chips = document.createElement("div");
+    chips.className = "chips";
 
-    if (list.length === 0) {
-      right.innerHTML = `<span class="muted">—</span>`;
+    let totalDay = 0;
+    if (codes.length === 0) {
+      chips.innerHTML = `<span class="muted">—</span>`;
     } else {
-      // afficher “logos” (icônes) + montant
-      for (const ev of list) {
-        const code = ev.extendedProps?.code || "";
-        const amount = Number(ev.extendedProps?.montant || 0);
-        total += amount;
-
-        const icon = BOOT.icons?.[code] || "🔖";
-        const label = BOOT.primeTypes?.[code]?.label || code;
+      codes.forEach(code => {
+        const p = BOOT.primeTypes[code];
+        if (!p) return;
+        totalDay += p.montant;
 
         const chip = document.createElement("div");
-        chip.className = "iconchip";
-        chip.title = label;
-
+        chip.className = "chip";
         chip.innerHTML = `
-          <span class="icon">${icon}</span>
-          <span class="amount">${amount.toFixed(2)}€</span>
+          <span class="icon">${BOOT.icons[code] || "🔖"}</span>
+          <span class="amount">${p.montant.toFixed(2)}€</span>
         `;
-        right.appendChild(chip);
-      }
+        chips.appendChild(chip);
+      });
     }
 
-    row.appendChild(left);
-    row.appendChild(right);
+    totalWeek += totalDay;
+    right.appendChild(chips);
+
+    // ADMIN PANEL
+    if (isAdmin) {
+      const panel = document.createElement("div");
+      panel.className = "admin-panel";
+
+      const checks = document.createElement("div");
+      checks.className = "checks";
+
+      Object.entries(BOOT.primeTypes).forEach(([code, p]) => {
+        const lab = document.createElement("label");
+        lab.className = "check";
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = code;
+        cb.checked = codes.includes(code);
+
+        lab.appendChild(cb);
+        lab.append(` ${BOOT.icons[code] || ""} ${code} — ${p.label}`);
+        checks.appendChild(lab);
+      });
+
+      const btn = document.createElement("button");
+      btn.className = "action";
+      btn.textContent = "Enregistrer ce jour";
+
+      btn.onclick = async () => {
+        const selected = [...checks.querySelectorAll("input")]
+          .filter(c => c.checked)
+          .map(c => c.value);
+
+        await api({
+          action: "setDayPlan",
+          codeAdmin: ADMIN_CODE,
+          agent: currentAgent,
+          date: dISO,
+          codes: selected.join(",")
+        });
+
+        refreshWeek();
+      };
+
+      panel.appendChild(checks);
+      panel.appendChild(btn);
+      right.appendChild(panel);
+    }
+
     dayListEl.appendChild(row);
   }
 
-  weekTotalEl.textContent = `Total semaine : ${total.toFixed(2)}€`;
+  weekTotalEl.textContent = `Total semaine : ${totalWeek.toFixed(2)}€`;
 }
 
-// ---------- Date utils (ISO week) ----------
-// Retourne lundi (ISO) de la semaine donnée
+/*************************************************
+ * DATE UTILS
+ *************************************************/
 function getISOWeekStartDate(year, week) {
-  // ISO: semaine 1 = semaine contenant le 4 janvier
   const jan4 = new Date(Date.UTC(year, 0, 4));
-  const jan4Day = (jan4.getUTCDay() + 6) % 7; // 0=lundi
-  const mondayWeek1 = new Date(jan4);
-  mondayWeek1.setUTCDate(jan4.getUTCDate() - jan4Day);
-
-  const monday = new Date(mondayWeek1);
-  monday.setUTCDate(mondayWeek1.getUTCDate() + (week - 1) * 7);
-
-  // repasse en local sans casser le YYYY-MM-DD
+  const day = (jan4.getUTCDay() + 6) % 7;
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - day + (week - 1) * 7);
   return new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate());
 }
 
-function getISOWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+function getISOWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
 }
 
-function addDays(date, n) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
+function addDays(d, n) {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
 }
 
-function toISODate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function toISO(d) {
+  return d.toISOString().slice(0, 10);
 }
 
-function dayNameFR(date) {
-  return ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"][((date.getDay()+6)%7)];
+function dayNameFR(d) {
+  return ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"][(d.getDay()+6)%7];
 }
 
-function formatFR(date) {
-  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+function formatFR(d) {
+  return d.toLocaleDateString("fr-FR");
 }
