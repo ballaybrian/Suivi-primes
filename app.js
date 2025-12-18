@@ -1,5 +1,5 @@
 // ===== CONFIG =====
-const API_URL = "https://script.google.com/macros/s/AKfycbzH5t37kIqFwVJX3zDbpO-uljb0QfuBjdasYuBWwdQW-1M5aR4GOB5huKewjA-Ljg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyh7YY2zSRfHhOUp5jk_cJmR9KPWqJcXUoCDtnOBXEIw0Bdj9WaU1P1UOc5kw4hmzTx/exec";
 const IS_ADMIN = new URLSearchParams(window.location.search).get("admin") === "1";
 
 // ===== STATE =====
