@@ -154,8 +154,7 @@ function renderHome() {
     `;
     b.onclick = () => openAgent(agent);
 
-    const targetRow = rows[idx] || row3;
-    targetRow.appendChild(b);
+    (rows[idx] || row3).appendChild(b);
   });
 
   groups.appendChild(row1);
@@ -266,9 +265,8 @@ async function refreshWeek() {
   weekLabel.textContent = `Semaine ${week} — ${year}` + (isAdmin ? " (Admin)" : "");
   rangeLabel.textContent = `${formatFR(start)} → ${formatFR(addDays(end, -1))}`;
 
-  // Récup planning
   const res = await api({ action: "weekPlan", agent: currentAgent, start: startISO, end: endISO });
-  const plan = res.plan || {}; // { "YYYY-MM-DD": ["ATTX","TCA"] }
+  const plan = res.plan || {};
 
   dayListEl.innerHTML = "";
   let totalWeek = 0;
@@ -290,7 +288,7 @@ async function refreshWeek() {
 
     const right = row.querySelector(".rightcol");
 
-    // Chips affichage
+    // Chips
     const chips = document.createElement("div");
     chips.className = "chips";
 
@@ -467,6 +465,7 @@ function getISOWeekStartDate(year, week) {
   const day = (jan4.getUTCDay() + 6) % 7; // 0=lundi
   const monday = new Date(jan4);
   monday.setUTCDate(jan4.getUTCDate() - day + (week - 1) * 7);
+  // retourne une date locale "propre"
   return new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate());
 }
 
@@ -483,8 +482,15 @@ function addDays(d, n) {
   return r;
 }
 
+/**
+ * IMPORTANT: ISO LOCAL (pas toISOString -> UTC)
+ * => règle définitivement le bug du lundi.
+ */
 function toISO(d) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function dayNameFR(d) {
