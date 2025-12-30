@@ -5,16 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Brigade TRIAGE</title>
 
+  <link rel="stylesheet" href="style.css" />
+
   <!-- PWA -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#7C3AED">
   <link rel="icon" href="favicon.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-
-  <link rel="stylesheet" href="style.css" />
+  <meta name="theme-color" content="#7C3AED">
 </head>
+
 <body>
   <header>Brigade TRIAGE</header>
 
@@ -64,17 +62,45 @@
         <div id="dayList" class="daylist"></div>
       </div>
     </section>
+
+    <!-- RECAP VIEW -->
+    <section id="recapView" class="hidden">
+      <div class="topbar">
+        <div class="row">
+          <button id="recapBackBtn">← Retour</button>
+          <div class="pill" id="recapAgentName"></div>
+        </div>
+        <div class="row">
+          <select id="recapYearSelect"></select>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="card">
+        <div class="row-between">
+          <div>
+            <div class="subtitle">Récap mensuel</div>
+            <div class="muted small">Total par mois (année sélectionnée)</div>
+          </div>
+          <div class="pill" id="recapYearTotal">Total année : —</div>
+        </div>
+
+        <div class="spacer"></div>
+        <div id="recapGrid" class="recap-grid"></div>
+      </div>
+    </section>
   </main>
 
-  <!-- Bouton admin discret -->
+  <!-- bouton admin discret -->
   <button id="adminHiddenBtn" class="admin-hidden-btn" title="Admin"></button>
 
-  <!-- Légende (barre info) -->
+  <!-- Légende fixe -->
   <div id="legend" class="legend">
     <div class="legend-title">Légende des primes</div>
     <div id="legendItems" class="legend-items"></div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=recap-1"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
  * CONFIG
  *************************************************/
 const API_URL = "https://script.google.com/macros/s/AKfycbx94ffDuY0bSr1TYRHrI71c70L-_6icRs9fgXTZOB_hOeFV0lAnSPmsPUAVDnFrliw/exec";
-const ADMIN_CODE = "1234"; // même code que dans Code.gs
+const ADMIN_CODE = "1234";
 
 /*************************************************
  * JSONP (anti-CORS GitHub Pages)
@@ -73,12 +73,21 @@ const dayListEl = document.getElementById("dayList");
 
 const adminBtn = document.getElementById("adminHiddenBtn");
 
+// RECAP DOM
+const recapViewEl = document.getElementById("recapView");
+const recapBackBtn = document.getElementById("recapBackBtn");
+const recapAgentNameEl = document.getElementById("recapAgentName");
+const recapYearSelect = document.getElementById("recapYearSelect");
+const recapGridEl = document.getElementById("recapGrid");
+const recapYearTotalEl = document.getElementById("recapYearTotal");
+
 /*************************************************
  * STATE
  *************************************************/
 let BOOT = null;
 let currentAgent = null;
 let isAdmin = sessionStorage.getItem("isAdmin") === "1";
+let recapAgent = null;
 
 /*************************************************
  * INIT
@@ -90,13 +99,17 @@ async function boot() {
 
   renderHome();
   initYearWeekSelectors();
+  initRecapYearSelector();
   renderLegend();
 
-  backBtn.onclick = goHome;
+  backBtn.onclick = showHome;
   prevWeekBtn.onclick = () => shiftWeek(-1);
   nextWeekBtn.onclick = () => shiftWeek(1);
   yearSelect.onchange = refreshWeek;
   weekSelect.onchange = refreshWeek;
+
+  recapBackBtn.onclick = showHome;
+  recapYearSelect.onchange = refreshRecap;
 
   adminBtn.onclick = () => {
     const code = prompt("Code admin ?");
@@ -106,7 +119,7 @@ async function boot() {
       isAdmin = true;
       sessionStorage.setItem("isAdmin", "1");
       alert("Mode admin activé");
-      refreshWeek();
+      if (!weekViewEl.classList.contains("hidden")) refreshWeek();
     } else {
       alert("Code incorrect");
     }
@@ -123,7 +136,19 @@ function showBootError(err) {
 }
 
 /*************************************************
- * HOME (2 / 3 / 3) + TUILES
+ * NAV
+ *************************************************/
+function showHome() {
+  currentAgent = null;
+  recapAgent = null;
+
+  homeEl.classList.remove("hidden");
+  weekViewEl.classList.add("hidden");
+  recapViewEl.classList.add("hidden");
+}
+
+/*************************************************
+ * HOME (2 / 3 / 3) + TUILES + RECAP BUTTON
  *************************************************/
 function renderHome() {
   agentButtonsEl.innerHTML = "";
@@ -143,42 +168,49 @@ function renderHome() {
   const rows = [row1, row1, row2, row2, row2, row3, row3, row3];
 
   (BOOT.agents || []).forEach((agent, idx) => {
-    const b = document.createElement("button");
-    b.className = "agent-tile";
-    b.innerHTML = `
+    const tile = document.createElement("div");
+    tile.className = "agent-tile";
+    tile.innerHTML = `
       <div class="left">
         <div class="name">${escapeHtml(agent)}</div>
         <div class="hint">Primes Semaine</div>
       </div>
-      <div class="arrow">→</div>
+      <div class="agent-actions">
+        <button class="recap-btn" type="button">Recap</button>
+        <div class="arrow">→</div>
+      </div>
     `;
-    b.onclick = () => openAgent(agent);
 
-    (rows[idx] || row3).appendChild(b);
+    tile.onclick = () => openAgent(agent);
+
+    tile.querySelector(".recap-btn").onclick = (ev) => {
+      ev.stopPropagation();
+      openRecap(agent);
+    };
+
+    (rows[idx] || row3).appendChild(tile);
   });
 
   groups.appendChild(row1);
   groups.appendChild(row2);
   groups.appendChild(row3);
+
   agentButtonsEl.appendChild(groups);
 }
 
 function openAgent(agent) {
   currentAgent = agent;
   agentNameEl.textContent = agent;
+
   homeEl.classList.add("hidden");
+  recapViewEl.classList.add("hidden");
   weekViewEl.classList.remove("hidden");
+
   refreshWeek();
 }
 
-function goHome() {
-  currentAgent = null;
-  homeEl.classList.remove("hidden");
-  weekViewEl.classList.add("hidden");
-}
-
 /*************************************************
- * LEGEND
+ * LÉGENDE
  *************************************************/
 function renderLegend() {
   const legendItemsEl = document.getElementById("legendItems");
@@ -248,7 +280,7 @@ function ensureYearOption(y) {
 }
 
 /*************************************************
- * CORE : WEEK DISPLAY + ADMIN RESET
+ * WEEK DISPLAY + ADMIN RESET
  *************************************************/
 async function refreshWeek() {
   if (!currentAgent) return;
@@ -256,8 +288,8 @@ async function refreshWeek() {
   const year = Number(yearSelect.value);
   const week = Number(weekSelect.value);
 
-  const start = getISOWeekStartDate(year, week); // lundi
-  const end = addDays(start, 7);                 // exclu
+  const start = getISOWeekStartDate(year, week);
+  const end = addDays(start, 7);
 
   const startISO = toISO(start);
   const endISO = toISO(end);
@@ -288,7 +320,7 @@ async function refreshWeek() {
 
     const right = row.querySelector(".rightcol");
 
-    // Chips
+    // chips
     const chips = document.createElement("div");
     chips.className = "chips";
 
@@ -299,7 +331,6 @@ async function refreshWeek() {
       for (const code of codes) {
         const p = BOOT.primeTypes?.[code];
         if (!p) continue;
-
         const amount = Number(p.montant || 0);
         totalDay += amount;
 
@@ -313,11 +344,10 @@ async function refreshWeek() {
         chips.appendChild(chip);
       }
     }
-
     totalWeek += totalDay;
     right.appendChild(chips);
 
-    // Admin panel
+    // admin
     if (isAdmin) {
       const panel = document.createElement("div");
       panel.className = "admin-panel";
@@ -423,7 +453,7 @@ async function refreshWeek() {
     dayListEl.appendChild(row);
   }
 
-  // Total + reset semaine
+  // total semaine + reset semaine
   if (isAdmin) {
     weekTotalEl.innerHTML = `
       Total semaine : ${totalWeek.toFixed(2)}€
@@ -458,14 +488,70 @@ async function refreshWeek() {
 }
 
 /*************************************************
+ * RECAP (12 mois)
+ *************************************************/
+function initRecapYearSelector() {
+  const now = new Date();
+  const y = now.getFullYear();
+
+  recapYearSelect.innerHTML = "";
+  [y - 1, y, y + 1].forEach((yy) => {
+    const o = document.createElement("option");
+    o.value = String(yy);
+    o.textContent = String(yy);
+    if (yy === y) o.selected = true;
+    recapYearSelect.appendChild(o);
+  });
+}
+
+function openRecap(agent) {
+  recapAgent = agent;
+  recapAgentNameEl.textContent = agent;
+
+  homeEl.classList.add("hidden");
+  weekViewEl.classList.add("hidden");
+  recapViewEl.classList.remove("hidden");
+
+  refreshRecap();
+}
+
+async function refreshRecap() {
+  if (!recapAgent) return;
+
+  const year = Number(recapYearSelect.value);
+  recapGridEl.innerHTML = "";
+  recapYearTotalEl.textContent = "Total année : …";
+
+  const res = await api({ action: "monthRecap", agent: recapAgent, year: String(year) });
+  const months = Array.isArray(res.months) ? res.months : Array(12).fill(0);
+
+  const labels = ["Janv","Févr","Mars","Avr","Mai","Juin","Juil","Août","Sept","Oct","Nov","Déc"];
+
+  let totalYear = 0;
+  for (let i = 0; i < 12; i++) {
+    const val = Number(months[i] || 0);
+    totalYear += val;
+
+    const card = document.createElement("div");
+    card.className = "recap-card";
+    card.innerHTML = `
+      <div class="recap-month">${labels[i]}</div>
+      <div class="recap-amount">${val.toFixed(2)}€</div>
+    `;
+    recapGridEl.appendChild(card);
+  }
+
+  recapYearTotalEl.textContent = `Total année : ${totalYear.toFixed(2)}€`;
+}
+
+/*************************************************
  * DATE UTILS
  *************************************************/
 function getISOWeekStartDate(year, week) {
   const jan4 = new Date(Date.UTC(year, 0, 4));
-  const day = (jan4.getUTCDay() + 6) % 7; // 0=lundi
+  const day = (jan4.getUTCDay() + 6) % 7;
   const monday = new Date(jan4);
   monday.setUTCDate(jan4.getUTCDate() - day + (week - 1) * 7);
-  // retourne une date locale "propre"
   return new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate());
 }
 
@@ -482,10 +568,7 @@ function addDays(d, n) {
   return r;
 }
 
-/**
- * IMPORTANT: ISO LOCAL (pas toISOString -> UTC)
- * => règle définitivement le bug du lundi.
- */
+/* FIX LUNDI : ISO LOCAL (pas UTC) */
 function toISO(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -501,9 +584,6 @@ function formatFR(d) {
   return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"2-digit", year:"numeric" });
 }
 
-/*************************************************
- * SMALL UTILS
- *************************************************/
 function escapeHtml(s) {
   return String(s)
     .replaceAll("&", "&amp;")
