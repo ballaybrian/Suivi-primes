@@ -141,7 +141,6 @@ async function boot() {
       sessionStorage.setItem("isAdmin", "1");
       alert("Mode admin activé");
       renderHome();
-      if (!weekViewEl.classList.contains("hidden")) refreshWeek();
     } else {
       alert("Code incorrect");
     }
@@ -176,7 +175,6 @@ function showHome() {
 function renderHome() {
   agentButtonsEl.innerHTML = "";
 
-  // bouton accès saisie semaine (admin seulement)
   if (isAdmin) {
     const top = document.createElement("div");
     top.className = "row";
@@ -315,7 +313,7 @@ function ensureYearOption(selectEl, y) {
 }
 
 /*************************************************
- * WEEK VIEW
+ * WEEK VIEW (lecture simple)
  *************************************************/
 async function refreshWeek() {
   if (!currentAgent) return;
@@ -329,7 +327,7 @@ async function refreshWeek() {
   const startISO = toISO(start);
   const endISO = toISO(end);
 
-  weekLabel.textContent = `Semaine ${week} — ${year}` + (isAdmin ? " (Admin)" : "");
+  weekLabel.textContent = `Semaine ${week} — ${year}`;
   rangeLabel.textContent = `${formatFR(start)} → ${formatFR(addDays(end, -1))}`;
 
   const res = await api({ action: "weekPlan", agent: currentAgent, start: startISO, end: endISO });
@@ -457,7 +455,7 @@ async function refreshRecap() {
 }
 
 /*************************************************
- * ADMIN - SAISIE SEMAINE (BULK)
+ * ADMIN - SAISIE SEMAINE (BULK) - CUSTOM DROPDOWN
  *************************************************/
 function initAdminYearWeekSelectors() {
   const now = new Date();
@@ -521,7 +519,7 @@ async function renderAdminWeekGrid() {
   adminRangeLabel.textContent = `${formatFR(start)} → ${formatFR(addDays(end, -1))}`;
   adminSaveStatus.textContent = "Chargement…";
 
-  // charge plan de la semaine pour chaque agent (8 appels => OK)
+  // charge plan semaine pour chaque agent (8 appels)
   const planByAgent = {};
   for (const agent of (BOOT.agents || [])) {
     const res = await api({ action: "weekPlan", agent, start: startISO, end: endISO });
@@ -544,15 +542,39 @@ async function renderAdminWeekGrid() {
     html += `<tr><td>${escapeHtml(agent)}</td>`;
 
     for (const day of days) {
-      const codes = (planByAgent[agent]?.[day.iso] || []);
+      const selected = (planByAgent[agent]?.[day.iso] || []);
+      const ddId = `dd_${hash(agent)}_${day.iso}`;
+
       html += `<td>
-        <select class="admin-multi" multiple data-agent="${escapeAttr(agent)}" data-date="${day.iso}">
-          ${primeEntries.map(([code, p]) => {
-            const sel = codes.includes(code) ? "selected" : "";
-            const icon = BOOT.icons?.[code] || "🔖";
-            return `<option value="${code}" ${sel}>${icon} ${code} — ${escapeHtml(p.label)} (${Number(p.montant).toFixed(2)}€)</option>`;
-          }).join("")}
-        </select>
+        <div class="prime-dd" id="${ddId}" data-agent="${escapeAttr(agent)}" data-date="${day.iso}">
+          <button type="button" class="prime-dd-btn">
+            <span class="muted">Choisir primes</span>
+          </button>
+
+          <div class="prime-dd-panel" role="dialog" aria-label="Choix primes">
+            <div class="prime-dd-list">
+              ${primeEntries.map(([code, p]) => {
+                const checked = selected.includes(code) ? "checked" : "";
+                const icon = BOOT.icons?.[code] || "🔖";
+                return `
+                  <label class="prime-dd-item">
+                    <input type="checkbox" value="${code}" ${checked}>
+                    <span>${icon} <b>${code}</b> — ${escapeHtml(p.label)} (${Number(p.montant).toFixed(2)}€)</span>
+                  </label>
+                `;
+              }).join("")}
+            </div>
+
+            <div class="prime-dd-footer">
+              <div class="prime-dd-actions">
+                <button type="button" class="prime-dd-clear">Tout vider</button>
+                <button type="button" class="prime-dd-close">Fermer</button>
+              </div>
+
+              <div class="prime-dd-selected"></div>
+            </div>
+          </div>
+        </div>
       </td>`;
     }
 
@@ -565,6 +587,7 @@ async function renderAdminWeekGrid() {
   adminWeekViewEl.dataset.startISO = startISO;
   adminWeekViewEl.dataset.endISO = endISO;
 
+  initPrimeDropdowns();
   adminSaveStatus.textContent = "—";
 }
 
@@ -573,15 +596,13 @@ async function saveAdminWeekBulk() {
   const endISO = adminWeekViewEl.dataset.endISO;
   if (!startISO || !endISO) return;
 
-  const selects = [...adminGridWrap.querySelectorAll("select.admin-multi")];
+  const dropdowns = [...adminGridWrap.querySelectorAll(".prime-dd")];
 
-  // payload: [{agent, days:{dateISO:[codes...]}}]
   const map = new Map();
-
-  for (const sel of selects) {
-    const agent = sel.dataset.agent;
-    const dateISO = sel.dataset.date;
-    const codes = [...sel.selectedOptions].map(o => o.value);
+  for (const dd of dropdowns) {
+    const agent = dd.dataset.agent;
+    const dateISO = dd.dataset.date;
+    const codes = getSelectedCodesFromDropdown(dd);
 
     if (!map.has(agent)) map.set(agent, {});
     map.get(agent)[dateISO] = codes;
@@ -610,6 +631,105 @@ async function saveAdminWeekBulk() {
     adminSaveWeekBtn.disabled = false;
     setTimeout(() => (adminSaveStatus.textContent = "—"), 2500);
   }
+}
+
+/*************************************************
+ * CUSTOM DROPDOWNS
+ *************************************************/
+function initPrimeDropdowns() {
+  const dropdowns = [...adminGridWrap.querySelectorAll(".prime-dd")];
+
+  // click outside => ferme tous
+  document.addEventListener("click", (e) => {
+    for (const dd of dropdowns) {
+      if (!dd.contains(e.target)) dd.classList.remove("open");
+    }
+  });
+
+  for (const dd of dropdowns) {
+    const btn = dd.querySelector(".prime-dd-btn");
+    const panel = dd.querySelector(".prime-dd-panel");
+    const list = dd.querySelector(".prime-dd-list");
+    const clearBtn = dd.querySelector(".prime-dd-clear");
+    const closeBtn = dd.querySelector(".prime-dd-close");
+
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      dd.classList.toggle("open");
+      refreshSelectedPills(dd);
+      refreshBtnLabel(dd);
+    };
+
+    panel.onclick = (ev) => ev.stopPropagation();
+
+    list.addEventListener("change", () => {
+      refreshSelectedPills(dd);
+      refreshBtnLabel(dd);
+    });
+
+    clearBtn.onclick = () => {
+      dd.querySelectorAll("input[type='checkbox']").forEach(cb => cb.checked = false);
+      refreshSelectedPills(dd);
+      refreshBtnLabel(dd);
+    };
+
+    closeBtn.onclick = () => dd.classList.remove("open");
+
+    // init
+    refreshSelectedPills(dd);
+    refreshBtnLabel(dd);
+  }
+}
+
+function getSelectedCodesFromDropdown(dd) {
+  return [...dd.querySelectorAll("input[type='checkbox']")]
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
+}
+
+function refreshBtnLabel(dd) {
+  const btn = dd.querySelector(".prime-dd-btn");
+  const codes = getSelectedCodesFromDropdown(dd);
+
+  if (codes.length === 0) {
+    btn.innerHTML = `<span class="muted">Choisir primes</span>`;
+  } else {
+    btn.textContent = `${codes.length} prime(s) sélectionnée(s)`;
+  }
+}
+
+function refreshSelectedPills(dd) {
+  const wrap = dd.querySelector(".prime-dd-selected");
+  wrap.innerHTML = "";
+
+  const codes = getSelectedCodesFromDropdown(dd);
+  for (const code of codes) {
+    const p = BOOT.primeTypes?.[code];
+    const icon = BOOT.icons?.[code] || "🔖";
+    const amount = Number(p?.montant || 0).toFixed(2);
+
+    const pill = document.createElement("div");
+    pill.className = "prime-pill";
+    pill.innerHTML = `
+      <span>${icon} ${code} — ${amount}€</span>
+      <button type="button" class="x" title="Retirer">✕</button>
+    `;
+
+    pill.querySelector(".x").onclick = () => {
+      const cb = dd.querySelector(`input[type='checkbox'][value="${code}"]`);
+      if (cb) cb.checked = false;
+      refreshSelectedPills(dd);
+      refreshBtnLabel(dd);
+    };
+
+    wrap.appendChild(pill);
+  }
+}
+
+function hash(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h.toString(16);
 }
 
 /*************************************************
@@ -642,7 +762,7 @@ function addDays(d, n) {
   return r;
 }
 
-// FIX LUNDI : ISO LOCAL (pas UTC)
+// ISO LOCAL (évite bug lundi/UTC)
 function toISO(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -670,7 +790,6 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
-// pour attribut HTML (data-agent)
 function escapeAttr(s) {
   return String(s).replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
