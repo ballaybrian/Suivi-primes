@@ -63,6 +63,44 @@
       </div>
     </section>
 
+    <!-- ADMIN WEEK ENTRY -->
+    <section id="adminWeekView" class="hidden">
+      <div class="topbar">
+        <div class="row">
+          <button id="adminWeekBackBtn">← Retour</button>
+          <div class="pill">Saisie semaine (Admin)</div>
+        </div>
+
+        <div class="row">
+          <select id="adminYearSelect"></select>
+          <select id="adminWeekSelect"></select>
+          <button id="adminPrevWeekBtn">◀</button>
+          <button id="adminNextWeekBtn">▶</button>
+          <button id="adminSaveWeekBtn" class="action">Enregistrer la semaine</button>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="card">
+        <div class="row-between">
+          <div>
+            <div class="subtitle" id="adminWeekLabel">Semaine —</div>
+            <div class="muted" id="adminRangeLabel">—</div>
+          </div>
+          <div class="pill" id="adminSaveStatus">—</div>
+        </div>
+
+        <div class="spacer"></div>
+        <div class="muted small">
+          Astuce : PC = multi-sélection (Ctrl+clic). Mobile = sélection multiple.
+        </div>
+
+        <div class="spacer"></div>
+        <div id="adminGridWrap" class="admin-grid-wrap"></div>
+      </div>
+    </section>
+
     <!-- RECAP VIEW -->
     <section id="recapView" class="hidden">
       <div class="topbar">
@@ -101,6 +139,6 @@
     <div id="legendItems" class="legend-items"></div>
   </div>
 
-  <script src="app.js?v=recap-1"></script>
+  <script src="app.js?v=admin-week-1"></script>
 </body>
 </html>

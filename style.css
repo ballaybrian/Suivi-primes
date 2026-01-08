@@ -1,11 +1,11 @@
 :root{
-  --bg:#E9EAEE;          /* fond gris */
-  --header:#CFCFD6;      /* entête gris */
+  --bg:#E9EAEE;
+  --header:#CFCFD6;
   --card:#FFFFFF;
   --text:#111111;
   --muted:#4b4b4b;
 
-  --violet:#7C3AED;      /* violet boutons */
+  --violet:#7C3AED;
   --violet-2:#6D28D9;
 
   --border: rgba(0,0,0,.10);
@@ -37,7 +37,7 @@ header{
   max-width: 980px;
   margin: 0 auto;
   padding: 16px;
-  padding-bottom: 92px; /* place légende */
+  padding-bottom: 92px;
 }
 
 .card{
@@ -52,7 +52,6 @@ header{
 .spacer{ height:12px; }
 .muted{ color: var(--muted); opacity: .9; }
 .small{ font-size: 13px; }
-
 .subtitle{ font-size:16px; font-weight:950; }
 
 .topbar{
@@ -91,6 +90,19 @@ select{
   border: 1px solid rgba(0,0,0,.14);
   background: #fff;
   font-size:14px;
+}
+
+button.action{
+  background: linear-gradient(135deg, var(--violet), var(--violet-2));
+  border: none;
+  color:#fff;
+  font-weight: 1000;
+}
+button.danger{
+  background:#fff;
+  border:1px solid rgba(160,60,60,.25);
+  color:#6f1e1e;
+  font-weight: 1000;
 }
 
 /* ===== LOGO ACCUEIL ===== */
@@ -136,12 +148,10 @@ select{
   gap:12px;
   justify-items:center;
 }
-
 .agent-row.two,
 .agent-row.three{
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
-
 @media (max-width: 720px){
   .agent-row.two, .agent-row.three{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -170,9 +180,7 @@ select{
 .agent-tile .left{ display:flex; flex-direction:column; gap:3px; }
 .agent-tile .name{ font-weight: 1000; letter-spacing:.2px; }
 .agent-tile .hint{ font-size: 12px; opacity: .9; font-weight: 700; }
-.agent-tile .arrow{ opacity:.95; font-weight: 1000; }
 
-/* bouton recap */
 .agent-actions{
   display:flex;
   gap:8px;
@@ -188,6 +196,8 @@ select{
   cursor:pointer;
 }
 .recap-btn:hover{ filter: brightness(1.05); }
+
+.arrow{ opacity:.95; font-weight: 1000; }
 
 /* liste jours */
 .daylist{ display:flex; flex-direction:column; gap:10px; }
@@ -222,7 +232,7 @@ select{
 .icon{ font-size: 18px; }
 .amount{ font-weight: 950; }
 
-/* admin panel */
+/* admin panel (ancien) gardé si besoin */
 .admin-panel{
   width: min(760px, 100%);
   padding: 12px;
@@ -230,33 +240,11 @@ select{
   border: 1px dashed rgba(0,0,0,.22);
   background: #fff;
 }
-.checks{ display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:8px; }
-.check{
-  display:flex; gap:10px; align-items:flex-start;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: #fff;
-}
-.check input{ width:18px; height:18px; margin-top:2px; }
-
-button.action{
-  background: linear-gradient(135deg, var(--violet), var(--violet-2));
-  border: none;
-  color:#fff;
-  font-weight: 1000;
-}
-button.danger{
-  background:#fff;
-  border:1px solid rgba(160,60,60,.25);
-  color:#6f1e1e;
-  font-weight: 1000;
-}
 
 /* bouton admin caché */
 .admin-hidden-btn{
   position: fixed;
-  bottom: 64px; /* au-dessus de la légende */
+  bottom: 64px;
   right: 12px;
   width: 22px;
   height: 22px;
@@ -269,7 +257,7 @@ button.danger{
 }
 .admin-hidden-btn:hover{ opacity:.35; }
 
-/* Légende = barre info violette texte noir */
+/* Légende */
 .legend{
   position: fixed;
   left: 0;
@@ -339,4 +327,50 @@ button.danger{
   margin-top: 8px;
   font-weight: 1100;
   font-size: 22px;
+}
+
+/* ===== ADMIN SAISIE SEMAINE ===== */
+.admin-grid-wrap{
+  overflow:auto;
+  border: 1px solid rgba(0,0,0,.10);
+  border-radius: 16px;
+}
+.admin-grid{
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+  background:#fff;
+}
+.admin-grid th,
+.admin-grid td{
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  border-right: 1px solid rgba(0,0,0,.06);
+  padding: 10px;
+  vertical-align: top;
+}
+.admin-grid th{
+  position: sticky;
+  top: 0;
+  background: #f6f6fb;
+  z-index: 2;
+  text-align: left;
+  font-weight: 1000;
+}
+.admin-grid th:first-child,
+.admin-grid td:first-child{
+  position: sticky;
+  left: 0;
+  background:#fff;
+  z-index: 3;
+  min-width: 220px;
+  font-weight: 1000;
+}
+.admin-multi{
+  width: 100%;
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,.14);
+  padding: 8px;
+  background:#fff;
+  font-size: 13px;
 }
